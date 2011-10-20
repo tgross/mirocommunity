@@ -15,10 +15,19 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with Miro Community.  If not, see <http://www.gnu.org/licenses/>.
 
-from django.conf import settings
+from django.contrib.sites.models import Site
+from django.core.validators import MinValueValidator
+from django.db import models
 
-def voting_enabled():
-    """
-    Returns a bool() indicating whether voting should be enabled on this site.
-    """
-    return 'voting' in settings.INSTALLED_APPS
+from localtv.models import Category
+
+
+class ContestSettings(models.Model):
+    #: The site these settings are for.
+    site = models.ForeignKey(Site)
+
+    #: Categories for which voting is enabled.
+    categories = models.ManyToManyField(Category, blank=True, null=True)
+
+    #: Max number of votes per category
+    max_votes = models.PositiveIntegerField(validators=[MinValueValidator(1)])

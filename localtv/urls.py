@@ -19,8 +19,7 @@ from django.conf.urls.defaults import patterns, include, url
 from django.contrib.auth.models import User
 from django.views.generic import ListView
 
-from localtv.listing.views import VideoSearchView, SiteListView, \
-                        CategoryVideoSearchView
+from localtv.listing.views import VideoSearchView, SiteListView
 from localtv.models import Category
 
 # "Base" patterns
@@ -34,7 +33,9 @@ urlpatterns = patterns(
     url(r'^newsletter/$', 'newsletter', name='localtv_newsletter'))
 
 # Listing patterns
-category_videos = CategoryVideoSearchView.as_view(
+# This has to be importable for now because of a hack in the view_video view
+# which imports this view to check whether the referer was a category page.
+category_videos = VideoSearchView.as_view(
     template_name='localtv/category.html',
     default_filter='category'
 )
@@ -87,17 +88,3 @@ urlpatterns += patterns(
     url(r'^goodies/', include('localtv.goodies.urls')),
     url(r'^share/', include('email_share.urls')),
     url(r'^playlists/', include('localtv.playlists.urls')))
-
-try:
-    import voting
-except ImportError:
-    pass # ignore voting
-else:
-    urlpatterns += patterns(
-        'localtv.views',
-        (r'^video/vote/(?P<object_id>\d+)/(?P<direction>up|clear)/?$',
-         'video_vote', dict(
-                template_object_name='video',
-                template_name='localtv/video_vote_confirm.html',
-                allow_xmlhttprequest=False),
-         'localtv_video_vote'))
