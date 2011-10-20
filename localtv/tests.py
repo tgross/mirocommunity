@@ -44,7 +44,6 @@ from django.test.client import Client, RequestFactory
 
 from haystack.query import SearchQuerySet
 
-import localtv.settings
 import localtv.templatetags.filters
 from localtv.middleware import UserIsAdminMiddleware
 from localtv import models

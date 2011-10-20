@@ -28,7 +28,6 @@ from django.shortcuts import render_to_response, get_object_or_404
 from django.template import RequestContext
 from django.views.decorators.vary import vary_on_headers
 
-import localtv.settings
 from localtv.models import Video, Watch, Category, NewsletterSettings, SiteLocation
 
 from localtv.playlists.models import Playlist, PlaylistItem

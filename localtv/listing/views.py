@@ -25,7 +25,6 @@ from django.http import Http404
 from django.views.generic import ListView
 from django.conf import settings
 
-import localtv.settings
 from localtv.models import Video, Category
 from localtv.search.forms import VideoSearchForm
 from localtv.search.utils import SortFilterViewMixin, SearchQuerysetSliceHack
