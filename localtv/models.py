@@ -1687,6 +1687,11 @@ class VideoManager(StatusedThumbnailableManager):
         ).distinct().order_by('-best_date')
 
 
+class CategoryVideo(models.Model):
+    category = models.ForeignKey(Category)
+    video = models.ForeignKey('Video')
+
+
 class Video(Thumbnailable, VideoBase, StatusedThumbnailable):
     """
     Fields:
@@ -1731,7 +1736,8 @@ class Video(Thumbnailable, VideoBase, StatusedThumbnailable):
      - notes: a free-text field to add notes about the video
     """
     site = models.ForeignKey(Site)
-    categories = models.ManyToManyField(Category, blank=True)
+    categories = models.ManyToManyField(Category, blank=True,
+                                        through=CategoryVideo)
     authors = models.ManyToManyField('auth.User', blank=True,
                                      related_name='authored_set')
     file_url = BitLyWrappingURLField(verify_exists=False, blank=True)
