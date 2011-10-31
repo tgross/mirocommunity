@@ -1691,6 +1691,9 @@ class CategoryVideo(models.Model):
     category = models.ForeignKey(Category)
     video = models.ForeignKey('Video')
 
+    class Meta:
+        unique_together = ('category', 'video')
+
 
 class Video(Thumbnailable, VideoBase, StatusedThumbnailable):
     """
