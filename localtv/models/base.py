@@ -291,6 +291,9 @@ class TierInfo(models.Model):
     sitelocation = models.OneToOneField('SiteLocation')
     objects = SingletonManager()
 
+    class Meta:
+        app_label = 'localtv'
+
     def get_payment_secret(self):
         '''The secret had better be non-empty. So we make it non-empty right here.'''
         if self.payment_secret:
@@ -413,6 +416,9 @@ class SiteLocation(Thumbnailable):
         (222, 169, False),
         (130, 110, FORCE_HEIGHT_PADDING) # Facebook
         ]
+
+    class Meta:
+        app_label = 'localtv'
 
     def __unicode__(self):
         return '%s (%s)' % (self.site.name, self.site.domain)
@@ -566,6 +572,9 @@ class NewsletterSettings(models.Model):
 
     objects = SingletonManager()
 
+    class Meta:
+        app_label = 'localtv'
+
     def videos(self):
         if self.status == NewsletterSettings.DISABLED:
             raise ValueError('no videos for disabled newsletter')
@@ -649,6 +658,9 @@ class WidgetSettings(Thumbnailable):
         (222, 169, False),
         ]
 
+    class Meta:
+        app_label = 'localtv'
+
     def get_title_or_reasonable_default(self):
         # Is the title worth using? If so, use that.
         use_title = True
@@ -702,7 +714,7 @@ class Source(Thumbnailable):
                                                   " automatically be imported "
                                                   "from this source."))
     user = models.ForeignKey('auth.User', null=True, blank=True)
-    auto_categories = models.ManyToManyField("Category", blank=True)
+    auto_categories = models.ManyToManyField("localtv.Category", blank=True)
     auto_authors = models.ManyToManyField("auth.User", blank=True,
                                           related_name='auto_%(class)s_set')
 
@@ -862,6 +874,7 @@ class Feed(Source, StatusedThumbnailable):
         unique_together = (
             ('feed_url', 'site'))
         get_latest_by = 'last_updated'
+        app_label = 'localtv'
 
     def __unicode__(self):
         return self.name
@@ -1012,6 +1025,7 @@ class Category(models.Model):
         unique_together = (
             ('slug', 'site'),
             ('name', 'site'))
+        app_label = 'localtv'
 
     def __unicode__(self):
         return self.name
@@ -1090,6 +1104,9 @@ class SavedSearch(Source):
     query_string = models.TextField()
     when_created = models.DateTimeField(auto_now_add=True)
 
+    class Meta:
+        app_label = 'localtv'
+
     def __unicode__(self):
         return self.query_string
 
@@ -1158,11 +1175,17 @@ class SourceImportIndex(models.Model):
 class FeedImportIndex(SourceImportIndex):
     source_import = models.ForeignKey('FeedImport', related_name='indexes')
 
+    class Meta:
+        app_label = 'localtv'
+
 
 class SearchImportIndex(SourceImportIndex):
     source_import = models.ForeignKey('SearchImport', related_name='indexes')
     #: This is just the name of the suite that was used to get this index.
     suite = models.CharField(max_length=30)
+
+    class Meta:
+        app_label = 'localtv'
 
 
 class SourceImportError(models.Model):
@@ -1179,9 +1202,15 @@ class SourceImportError(models.Model):
 class FeedImportError(SourceImportError):
     source_import = models.ForeignKey('FeedImport', related_name='errors')
 
+    class Meta:
+        app_label = 'localtv'
+
 
 class SearchImportError(SourceImportError):
     source_import = models.ForeignKey('SearchImport', related_name='errors')
+
+    class Meta:
+        app_label = 'localtv'
 
 
 class SourceImport(models.Model):
@@ -1285,6 +1314,9 @@ class SourceImport(models.Model):
 class FeedImport(SourceImport):
     source = models.ForeignKey(Feed, related_name='imports')
 
+    class Meta:
+        app_label = 'localtv'
+
     def set_video_source(self, video):
         video.feed_id = self.source_id
 
@@ -1295,6 +1327,9 @@ class FeedImport(SourceImport):
 
 class SearchImport(SourceImport):
     source = models.ForeignKey(SavedSearch, related_name='imports')
+
+    class Meta:
+        app_label = 'localtv'
 
     def set_video_source(self, video):
         video.search_id = self.source_id
@@ -1332,6 +1367,9 @@ class OriginalVideo(VideoBase):
     thumbnail_updated = models.DateTimeField(blank=True)
     remote_video_was_deleted = models.IntegerField(default=VIDEO_ACTIVE)
     remote_thumbnail_hash = models.CharField(max_length=64, default='')
+
+    class Meta:
+        app_label = 'localtv'
 
     def changed_fields(self, override_vidscraper_result=None):
         """
@@ -1796,6 +1834,7 @@ class Video(Thumbnailable, VideoBase, StatusedThumbnailable):
     class Meta:
         ordering = ['-when_submitted']
         get_latest_by = 'when_modified'
+        app_label = 'localtv'
 
     def __unicode__(self):
         return self.name
@@ -2049,6 +2088,9 @@ class Watch(models.Model):
     timestamp = models.DateTimeField(auto_now_add=True)
     user = models.ForeignKey('auth.User', blank=True, null=True)
     ip_address = models.IPAddressField()
+
+    class Meta:
+        app_label = 'localtv'
 
     @classmethod
     def add(Class, request, video):

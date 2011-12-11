@@ -27,7 +27,8 @@ from django.utils.encoding import force_unicode
 from django.views.decorators.csrf import csrf_protect
 
 from localtv.decorators import require_site_admin
-from localtv.models import SiteLocation, Feed, SavedSearch, Category, VIDEO_SERVICE_REGEXES
+from localtv.models import SiteLocation, Feed, SavedSearch, Category
+from localtv.models.base import VIDEO_SERVICE_REGEXES
 from localtv.utils import SortHeaders, MockQueryset
 from localtv.admin import forms
 
