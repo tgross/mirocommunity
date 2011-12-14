@@ -15,15 +15,17 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with Miro Community.  If not, see <http://www.gnu.org/licenses/>.
 
+import base64
 import datetime
 import logging
+import os
 
-from django.db import models
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.sites.models import Site
 from django.core.mail import EmailMessage
 from django.core.signals import request_finished
+from django.db import models
 from django.template.loader import render_to_string
 from django.utils.html import escape
 from django.utils.translation import ugettext_lazy as _
@@ -32,7 +34,8 @@ from notification import models as notification
 from localtv import tiers
 from localtv.models.base import (Thumbnailable, DISABLED_STATUS_TEXT,
                                  ACTIVE_STATUS_TEXT, FORCE_HEIGHT_PADDING)
-from localtv.settings import DISABLE_TIERS_ENFORCEMENT
+from localtv.settings import (DISABLE_TIERS_ENFORCEMENT, SHOW_ADMIN_DASHBOARD,
+                              SHOW_ADMIN_ACCOUNT_LEVEL, USE_ZENDESK)
 
 
 SITE_LOCATION_CACHE = {}

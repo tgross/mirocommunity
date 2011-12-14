@@ -387,6 +387,7 @@ class SourceImport(models.Model):
         get_latest_by = 'start'
         ordering = ['-start']
         abstract = True
+        app_label = 'localtv'
 
     def set_video_source(self, video):
         """
@@ -463,9 +464,6 @@ class SourceImport(models.Model):
 class FeedImport(SourceImport):
     source = models.ForeignKey(Feed, related_name='imports')
 
-    class Meta:
-        app_label = 'localtv'
-
     def set_video_source(self, video):
         video.feed_id = self.source_id
 
@@ -476,9 +474,6 @@ class FeedImport(SourceImport):
 
 class SearchImport(SourceImport):
     source = models.ForeignKey(SavedSearch, related_name='imports')
-
-    class Meta:
-        app_label = 'localtv'
 
     def set_video_source(self, video):
         video.search_id = self.source_id

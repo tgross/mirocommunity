@@ -18,6 +18,7 @@
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.sites.models import Site
 from django.db import models
+from django.utils.safestring import mark_safe
 from django.utils.translation import ugettext_lazy as _
 
 from localtv.models.videos import Video
@@ -133,7 +134,7 @@ class Category(models.Model):
         """
         Returns True if this category has videos with votes.
         """
-        if not VOTING_ENABLED:
+        if not voting_enabled():
             return False
         import voting
         return voting.models.Vote.objects.filter(
