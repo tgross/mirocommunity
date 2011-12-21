@@ -8,14 +8,30 @@ from django.db import models
 class Migration(SchemaMigration):
 
     def forwards(self, orm):
-        # Adding field 'Category.contest_mode'
-        db.add_column('localtv_category', 'contest_mode',
-                      self.gf('django.db.models.fields.DateTimeField')(default=None, null=True),
-                      keep_default=False)
+        # Adding model 'FeedImport'
+        db.create_table('localtv_feedimport', (
+            ('id', self.gf('django.db.models.fields.AutoField')(primary_key=True)),
+            ('feed', self.gf('django.db.models.fields.related.ForeignKey')(to=orm['localtv.Feed'])),
+            ('start', self.gf('django.db.models.fields.DateTimeField')(auto_now_add=True, blank=True)),
+            ('end', self.gf('django.db.models.fields.DateTimeField')(null=True)),
+        ))
+        db.send_create_signal('localtv', ['FeedImport'])
+
+        # Adding model 'FeedImportIndex'
+        db.create_table('localtv_feedimportindex', (
+            ('id', self.gf('django.db.models.fields.AutoField')(primary_key=True)),
+            ('feedimport', self.gf('django.db.models.fields.related.ForeignKey')(to=orm['localtv.FeedImport'])),
+            ('video', self.gf('django.db.models.fields.related.OneToOneField')(to=orm['localtv.Video'], unique=True)),
+            ('index', self.gf('django.db.models.fields.IntegerField')()),
+        ))
+        db.send_create_signal('localtv', ['FeedImportIndex'])
 
     def backwards(self, orm):
-        # Deleting field 'Category.contest_mode'
-        db.delete_column('localtv_category', 'contest_mode')
+        # Deleting model 'FeedImport'
+        db.delete_table('localtv_feedimport')
+
+        # Deleting model 'FeedImportIndex'
+        db.delete_table('localtv_feedimportindex')
 
     models = {
         'auth.group': {
@@ -85,6 +101,20 @@ class Migration(SchemaMigration):
             'user': ('django.db.models.fields.related.ForeignKey', [], {'to': "orm['auth.User']", 'null': 'True', 'blank': 'True'}),
             'webpage': ('django.db.models.fields.URLField', [], {'max_length': '200', 'blank': 'True'}),
             'when_submitted': ('django.db.models.fields.DateTimeField', [], {'auto_now_add': 'True', 'blank': 'True'})
+        },
+        'localtv.feedimport': {
+            'Meta': {'object_name': 'FeedImport'},
+            'end': ('django.db.models.fields.DateTimeField', [], {'null': 'True'}),
+            'feed': ('django.db.models.fields.related.ForeignKey', [], {'to': "orm['localtv.Feed']"}),
+            'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
+            'start': ('django.db.models.fields.DateTimeField', [], {'auto_now_add': 'True', 'blank': 'True'})
+        },
+        'localtv.feedimportindex': {
+            'Meta': {'object_name': 'FeedImportIndex'},
+            'feedimport': ('django.db.models.fields.related.ForeignKey', [], {'to': "orm['localtv.FeedImport']"}),
+            'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
+            'index': ('django.db.models.fields.IntegerField', [], {}),
+            'video': ('django.db.models.fields.related.OneToOneField', [], {'to': "orm['localtv.Video']", 'unique': 'True'})
         },
         'localtv.newslettersettings': {
             'Meta': {'object_name': 'NewsletterSettings'},

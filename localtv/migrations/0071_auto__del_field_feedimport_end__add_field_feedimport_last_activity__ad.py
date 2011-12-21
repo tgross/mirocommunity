@@ -8,14 +8,54 @@ from django.db import models
 class Migration(SchemaMigration):
 
     def forwards(self, orm):
-        # Adding field 'Category.contest_mode'
-        db.add_column('localtv_category', 'contest_mode',
-                      self.gf('django.db.models.fields.DateTimeField')(default=None, null=True),
+        # Deleting field 'FeedImport.end'
+        db.delete_column('localtv_feedimport', 'end')
+
+        # Adding field 'FeedImport.last_activity'
+        db.add_column('localtv_feedimport', 'last_activity',
+                      self.gf('django.db.models.fields.DateTimeField')(null=True, blank=True),
+                      keep_default=False)
+
+        # Adding field 'FeedImport.status'
+        db.add_column('localtv_feedimport', 'status',
+                      self.gf('django.db.models.fields.CharField')(default='started', max_length=10),
+                      keep_default=False)
+
+        # Deleting field 'SearchImport.end'
+        db.delete_column('localtv_searchimport', 'end')
+
+        # Adding field 'SearchImport.last_activity'
+        db.add_column('localtv_searchimport', 'last_activity',
+                      self.gf('django.db.models.fields.DateTimeField')(null=True, blank=True),
+                      keep_default=False)
+
+        # Adding field 'SearchImport.status'
+        db.add_column('localtv_searchimport', 'status',
+                      self.gf('django.db.models.fields.CharField')(default='started', max_length=10),
                       keep_default=False)
 
     def backwards(self, orm):
-        # Deleting field 'Category.contest_mode'
-        db.delete_column('localtv_category', 'contest_mode')
+        # Adding field 'FeedImport.end'
+        db.add_column('localtv_feedimport', 'end',
+                      self.gf('django.db.models.fields.DateTimeField')(null=True, blank=True),
+                      keep_default=False)
+
+        # Deleting field 'FeedImport.last_activity'
+        db.delete_column('localtv_feedimport', 'last_activity')
+
+        # Deleting field 'FeedImport.status'
+        db.delete_column('localtv_feedimport', 'status')
+
+        # Adding field 'SearchImport.end'
+        db.add_column('localtv_searchimport', 'end',
+                      self.gf('django.db.models.fields.DateTimeField')(null=True, blank=True),
+                      keep_default=False)
+
+        # Deleting field 'SearchImport.last_activity'
+        db.delete_column('localtv_searchimport', 'last_activity')
+
+        # Deleting field 'SearchImport.status'
+        db.delete_column('localtv_searchimport', 'status')
 
     models = {
         'auth.group': {
@@ -86,6 +126,34 @@ class Migration(SchemaMigration):
             'webpage': ('django.db.models.fields.URLField', [], {'max_length': '200', 'blank': 'True'}),
             'when_submitted': ('django.db.models.fields.DateTimeField', [], {'auto_now_add': 'True', 'blank': 'True'})
         },
+        'localtv.feedimport': {
+            'Meta': {'ordering': "['-start']", 'object_name': 'FeedImport'},
+            'auto_approve': ('django.db.models.fields.BooleanField', [], {'default': 'False'}),
+            'feed': ('django.db.models.fields.related.ForeignKey', [], {'to': "orm['localtv.Feed']"}),
+            'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
+            'last_activity': ('django.db.models.fields.DateTimeField', [], {'null': 'True', 'blank': 'True'}),
+            'start': ('django.db.models.fields.DateTimeField', [], {'auto_now_add': 'True', 'blank': 'True'}),
+            'status': ('django.db.models.fields.CharField', [], {'default': "'started'", 'max_length': '10'}),
+            'total_videos': ('django.db.models.fields.PositiveIntegerField', [], {'null': 'True', 'blank': 'True'}),
+            'videos_imported': ('django.db.models.fields.PositiveIntegerField', [], {'default': '0'}),
+            'videos_skipped': ('django.db.models.fields.PositiveIntegerField', [], {'default': '0'})
+        },
+        'localtv.feedimporterror': {
+            'Meta': {'object_name': 'FeedImportError'},
+            'datetime': ('django.db.models.fields.DateTimeField', [], {'auto_now_add': 'True', 'blank': 'True'}),
+            'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
+            'is_skip': ('django.db.models.fields.BooleanField', [], {'default': 'False'}),
+            'message': ('django.db.models.fields.TextField', [], {}),
+            'source_import': ('django.db.models.fields.related.ForeignKey', [], {'to': "orm['localtv.FeedImport']"}),
+            'traceback': ('django.db.models.fields.TextField', [], {'blank': 'True'})
+        },
+        'localtv.feedimportindex': {
+            'Meta': {'object_name': 'FeedImportIndex'},
+            'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
+            'index': ('django.db.models.fields.PositiveIntegerField', [], {'null': 'True', 'blank': 'True'}),
+            'source_import': ('django.db.models.fields.related.ForeignKey', [], {'to': "orm['localtv.FeedImport']"}),
+            'video': ('django.db.models.fields.related.OneToOneField', [], {'to': "orm['localtv.Video']", 'unique': 'True'})
+        },
         'localtv.newslettersettings': {
             'Meta': {'object_name': 'NewsletterSettings'},
             'facebook_url': ('django.db.models.fields.URLField', [], {'max_length': '200', 'blank': 'True'}),
@@ -126,6 +194,35 @@ class Migration(SchemaMigration):
             'thumbnail_extension': ('django.db.models.fields.CharField', [], {'max_length': '8', 'blank': 'True'}),
             'user': ('django.db.models.fields.related.ForeignKey', [], {'to': "orm['auth.User']", 'null': 'True', 'blank': 'True'}),
             'when_created': ('django.db.models.fields.DateTimeField', [], {'auto_now_add': 'True', 'blank': 'True'})
+        },
+        'localtv.searchimport': {
+            'Meta': {'ordering': "['-start']", 'object_name': 'SearchImport'},
+            'auto_approve': ('django.db.models.fields.BooleanField', [], {'default': 'False'}),
+            'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
+            'last_activity': ('django.db.models.fields.DateTimeField', [], {'null': 'True', 'blank': 'True'}),
+            'search': ('django.db.models.fields.related.ForeignKey', [], {'to': "orm['localtv.SavedSearch']"}),
+            'start': ('django.db.models.fields.DateTimeField', [], {'auto_now_add': 'True', 'blank': 'True'}),
+            'status': ('django.db.models.fields.CharField', [], {'default': "'started'", 'max_length': '10'}),
+            'total_videos': ('django.db.models.fields.PositiveIntegerField', [], {'null': 'True', 'blank': 'True'}),
+            'videos_imported': ('django.db.models.fields.PositiveIntegerField', [], {'default': '0'}),
+            'videos_skipped': ('django.db.models.fields.PositiveIntegerField', [], {'default': '0'})
+        },
+        'localtv.searchimporterror': {
+            'Meta': {'object_name': 'SearchImportError'},
+            'datetime': ('django.db.models.fields.DateTimeField', [], {'auto_now_add': 'True', 'blank': 'True'}),
+            'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
+            'is_skip': ('django.db.models.fields.BooleanField', [], {'default': 'False'}),
+            'message': ('django.db.models.fields.TextField', [], {}),
+            'source_import': ('django.db.models.fields.related.ForeignKey', [], {'to': "orm['localtv.SearchImport']"}),
+            'traceback': ('django.db.models.fields.TextField', [], {'blank': 'True'})
+        },
+        'localtv.searchimportindex': {
+            'Meta': {'object_name': 'SearchImportIndex'},
+            'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
+            'index': ('django.db.models.fields.PositiveIntegerField', [], {'null': 'True', 'blank': 'True'}),
+            'source_import': ('django.db.models.fields.related.ForeignKey', [], {'to': "orm['localtv.SearchImport']"}),
+            'suite': ('django.db.models.fields.CharField', [], {'max_length': '30'}),
+            'video': ('django.db.models.fields.related.OneToOneField', [], {'to': "orm['localtv.Video']", 'unique': 'True'})
         },
         'localtv.sitelocation': {
             'Meta': {'object_name': 'SiteLocation'},

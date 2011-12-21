@@ -41,7 +41,8 @@ class SearchQuerysetSliceHack(object):
     def __getitem__(self, k):
         results = self.searchqueryset[k]
         if isinstance(results, list):
-            return [result.object for result in results]
+            return [result.object for result in results
+                    if result is not None]
         return result.object
 
     def __len__(self):
@@ -160,20 +161,23 @@ class SortFilterMixin(object):
                         new_filter_objects = list(filter_objects)
                     except TypeError:
                         new_filter_objects = []
-
                 clean_filter_dict[filter_name] = new_filter_objects
                 if new_filter_objects:
                     pks = [obj.pk for obj in new_filter_objects]
                     sq = None
 
                     for field in filter_def['fields']:
-                        new_sq = SQ(**{"%s__in" % field: pks})
+                        if len(pks) > 1:
+                            # Use __in if there are multiple pks.
+                            new_sq = SQ(**{"%s__in" % field: pks})
+                        else:
+                            # Otherwise do an exact query on the single pk.
+                            new_sq = SQ(**{field: pks[0]})
                         if sq is None:
                             sq = new_sq
                         else:
                             sq |= new_sq
                     searchqueryset = searchqueryset.filter(sq)
-
         return searchqueryset, clean_filter_dict
 
 

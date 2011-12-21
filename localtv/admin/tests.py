@@ -38,13 +38,17 @@ from uploadtemplate.models import Theme
 import vidscraper
 
 from localtv import utils
-from localtv.admin.utils import MetasearchVideo
 import localtv.management.commands.check_frequently_for_invalid_tiers_state
 from localtv.models import Feed, Video, SavedSearch, Category, SiteLocation, TierInfo
 from localtv.tests import BaseTestCase
 import localtv.tiers
 
 Profile = utils.get_profile_model()
+
+NAME_TO_COST = localtv.tiers.Tier.NAME_TO_COST()
+PLUS_COST = NAME_TO_COST['plus']
+PREMIUM_COST = NAME_TO_COST['premium']
+MAX_COST = NAME_TO_COST['max']
 
 class AdministrationBaseTestCase(BaseTestCase):
 
@@ -111,15 +115,15 @@ class ApproveRejectAdministrationTestCase(AdministrationBaseTestCase):
         c = Client()
         c.login(username='admin', password='admin')
         response = c.get(self.url)
-        self.assertEquals(response.template[0].name,
+        self.assertEqual(response.template[0].name,
                           'localtv/admin/approve_reject_table.html')
         self.assertIsInstance(response.context['current_video'],
                               Video)
         self.assertIsInstance(response.context['page_obj'],
                               Page)
         video_list = response.context['video_list']
-        self.assertEquals(video_list[0], response.context['current_video'])
-        self.assertEquals(len(video_list), 10)
+        self.assertEqual(video_list[0], response.context['current_video'])
+        self.assertEqual(len(video_list), 10)
 
     def test_GET_with_page(self):
         """
@@ -135,19 +139,19 @@ class ApproveRejectAdministrationTestCase(AdministrationBaseTestCase):
         response = c.get(self.url)
         page1_response = c.get(self.url,
                                {'page': '1'})
-        self.assertEquals(list(response.context['video_list']),
+        self.assertEqual(list(response.context['video_list']),
                           list(page1_response.context['video_list']))
-        self.assertEquals(list(page1_response.context['video_list']),
+        self.assertEqual(list(page1_response.context['video_list']),
                           list(unapproved_videos[:10]))
         page2_response = c.get(self.url,
                                {'page': '2'})
         self.assertNotEquals(page1_response, page2_response)
-        self.assertEquals(list(page2_response.context['video_list']),
+        self.assertEqual(list(page2_response.context['video_list']),
                           list(unapproved_videos[10:20]))
         page3_response = c.get(self.url,
                                {'page': '3'}) # doesn't exist, should return
                                               # page 2
-        self.assertEquals(list(page2_response.context['video_list']),
+        self.assertEqual(list(page2_response.context['video_list']),
                           list(page3_response.context['video_list']))
 
     def test_GET_preview(self):
@@ -165,9 +169,9 @@ class ApproveRejectAdministrationTestCase(AdministrationBaseTestCase):
         c.login(username='admin', password='admin')
         response = c.get(url,
                          {'video_id': str(video.pk)})
-        self.assertEquals(response.template[0].name,
+        self.assertEqual(response.template[0].name,
                           'localtv/admin/video_preview.html')
-        self.assertEquals(response.context['current_video'],
+        self.assertEqual(response.context['current_video'],
                           video)
 
     def test_GET_approve(self):
@@ -185,11 +189,11 @@ class ApproveRejectAdministrationTestCase(AdministrationBaseTestCase):
         response = c.get(url, {'video_id': str(video.pk)},
                          HTTP_REFERER='http://referer.com')
         self.assertStatusCodeEquals(response, 302)
-        self.assertEquals(response['Location'],
+        self.assertEqual(response['Location'],
                           'http://referer.com')
 
         video = Video.objects.get(pk=video.pk) # reload
-        self.assertEquals(video.status, Video.ACTIVE)
+        self.assertEqual(video.status, Video.ACTIVE)
         self.assertTrue(video.when_approved is not None)
         self.assertTrue(video.last_featured is None)
 
@@ -233,8 +237,8 @@ class ApproveRejectAdministrationTestCase(AdministrationBaseTestCase):
         c.login(username='admin', password='admin')
         c.get(url, {'video_id': str(video.pk)})
 
-        self.assertEquals(len(mail.outbox), 1)
-        self.assertEquals(mail.outbox[0].recipients(),
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].recipients(),
                           [video.user.email])
 
     def test_GET_approve_with_feature(self):
@@ -256,11 +260,11 @@ class ApproveRejectAdministrationTestCase(AdministrationBaseTestCase):
                                'feature': 'yes'},
                          HTTP_REFERER='http://referer.com')
         self.assertStatusCodeEquals(response, 302)
-        self.assertEquals(response['Location'],
+        self.assertEqual(response['Location'],
                           'http://referer.com')
 
         video = Video.objects.get(pk=video.pk) # reload
-        self.assertEquals(video.status, Video.ACTIVE)
+        self.assertEqual(video.status, Video.ACTIVE)
         self.assertTrue(video.when_approved is not None)
         self.assertTrue(video.last_featured is not None)
 
@@ -279,11 +283,11 @@ class ApproveRejectAdministrationTestCase(AdministrationBaseTestCase):
         response = c.get(url, {'video_id': str(video.pk)},
                          HTTP_REFERER='http://referer.com')
         self.assertStatusCodeEquals(response, 302)
-        self.assertEquals(response['Location'],
+        self.assertEqual(response['Location'],
                           'http://referer.com')
 
         video = Video.objects.get(pk=video.pk) # reload
-        self.assertEquals(video.status, Video.REJECTED)
+        self.assertEqual(video.status, Video.REJECTED)
         self.assertTrue(video.last_featured is None)
 
     def test_GET_feature(self):
@@ -302,11 +306,11 @@ class ApproveRejectAdministrationTestCase(AdministrationBaseTestCase):
         response = c.get(url, {'video_id': str(video.pk)},
                          HTTP_REFERER='http://referer.com')
         self.assertStatusCodeEquals(response, 302)
-        self.assertEquals(response['Location'],
+        self.assertEqual(response['Location'],
                           'http://referer.com')
 
         video = Video.objects.get(pk=video.pk) # reload
-        self.assertEquals(video.status, Video.ACTIVE)
+        self.assertEqual(video.status, Video.ACTIVE)
         self.assertTrue(video.when_approved is not None)
         self.assertTrue(video.last_featured is not None)
 
@@ -345,11 +349,11 @@ class ApproveRejectAdministrationTestCase(AdministrationBaseTestCase):
         response = c.get(url, {'video_id': str(video.pk)},
                          HTTP_REFERER='http://referer.com')
         self.assertStatusCodeEquals(response, 302)
-        self.assertEquals(response['Location'],
+        self.assertEqual(response['Location'],
                           'http://referer.com')
 
         video = Video.objects.get(pk=video.pk) # reload
-        self.assertEquals(video.status, Video.ACTIVE)
+        self.assertEqual(video.status, Video.ACTIVE)
         self.assertTrue(video.last_featured is None)
 
     def test_GET_reject_all(self):
@@ -368,11 +372,11 @@ class ApproveRejectAdministrationTestCase(AdministrationBaseTestCase):
         response = c.get(url, {'page': 2},
                          HTTP_REFERER='http://referer.com')
         self.assertStatusCodeEquals(response, 302)
-        self.assertEquals(response['Location'],
+        self.assertEqual(response['Location'],
                           'http://referer.com')
 
         for video in page2_videos:
-            self.assertEquals(video.status, Video.REJECTED)
+            self.assertEqual(video.status, Video.REJECTED)
 
     def test_GET_approve_all(self):
         """
@@ -390,11 +394,11 @@ class ApproveRejectAdministrationTestCase(AdministrationBaseTestCase):
         response = c.get(url, {'page': 2},
                          HTTP_REFERER='http://referer.com')
         self.assertStatusCodeEquals(response, 302)
-        self.assertEquals(response['Location'],
+        self.assertEqual(response['Location'],
                           'http://referer.com')
 
         for video in page2_videos:
-            self.assertEquals(video.status, Video.ACTIVE)
+            self.assertEqual(video.status, Video.ACTIVE)
             self.assertTrue(video.when_approved is not None)
 
 
@@ -414,13 +418,13 @@ class ApproveRejectAdministrationTestCase(AdministrationBaseTestCase):
         c.login(username='admin', password='admin')
         response = c.get(url)
         self.assertStatusCodeEquals(response, 200)
-        self.assertEquals(response.template[0].name,
+        self.assertEqual(response.template[0].name,
                           'localtv/admin/clear_confirm.html')
-        self.assertEquals(list(response.context['videos']),
+        self.assertEqual(list(response.context['videos']),
                           list(unapproved_videos))
 
         # nothing was rejected
-        self.assertEquals(Video.objects.unapproved().count(),
+        self.assertEqual(Video.objects.unapproved().count(),
                           unapproved_videos_count)
 
     def test_POST_clear_all_failure(self):
@@ -439,13 +443,13 @@ class ApproveRejectAdministrationTestCase(AdministrationBaseTestCase):
         c.login(username='admin', password='admin')
         response = c.post(url)
         self.assertStatusCodeEquals(response, 200)
-        self.assertEquals(response.template[0].name,
+        self.assertEqual(response.template[0].name,
                           'localtv/admin/clear_confirm.html')
-        self.assertEquals(list(response.context['videos']),
+        self.assertEqual(list(response.context['videos']),
                           list(unapproved_videos))
 
         # nothing was rejected
-        self.assertEquals(Video.objects.unapproved().count(),
+        self.assertEqual(Video.objects.unapproved().count(),
                           unapproved_videos_count)
 
     def test_POST_clear_all_succeed(self):
@@ -465,13 +469,13 @@ class ApproveRejectAdministrationTestCase(AdministrationBaseTestCase):
         c.login(username='admin', password='admin')
         response = c.post(url, {'confirm': 'yes'})
         self.assertStatusCodeEquals(response, 302)
-        self.assertEquals(response['Location'],
+        self.assertEqual(response['Location'],
                           'http://%s%s' % (
                 'testserver',
                 reverse('localtv_admin_approve_reject')))
 
         # all the unapproved videos are now rejected
-        self.assertEquals(Video.objects.rejected().count(),
+        self.assertEqual(Video.objects.rejected().count(),
                           unapproved_videos_count + rejected_videos_count)
 
 
@@ -510,22 +514,22 @@ class SourcesAdministrationTestCase(AdministrationBaseTestCase):
         c.login(username='admin', password='admin')
         response = c.get(self.url)
         self.assertStatusCodeEquals(response, 200)
-        self.assertEquals(response.template[0].name,
+        self.assertEqual(response.template[0].name,
                           'localtv/admin/manage_sources.html')
         self.assertTrue('add_feed_form' in response.context[0])
         self.assertTrue('page' in response.context[0])
         self.assertTrue('headers' in response.context[0])
-        self.assertEquals(response.context[0]['search_string'], '')
+        self.assertEqual(response.context[0]['search_string'], '')
         self.assertTrue(response.context[0]['source_filter'] is None)
-        self.assertEquals(response.context[0]['categories'].model,
+        self.assertEqual(response.context[0]['categories'].model,
                           Category)
         self.assertTrue(response.context[0]['users'].model, User)
         self.assertTrue('successful' in response.context[0])
         self.assertTrue('formset' in response.context[0])
 
         page = response.context['page']
-        self.assertEquals(len(page.object_list), 15)
-        self.assertEquals(list(sorted(page.object_list,
+        self.assertEqual(len(page.object_list), 15)
+        self.assertEqual(list(sorted(page.object_list,
                                       key=lambda x:unicode(x).lower())),
                           page.object_list)
 
@@ -539,14 +543,14 @@ class SourcesAdministrationTestCase(AdministrationBaseTestCase):
         c.login(username='admin', password='admin')
         response = c.get(self.url)
         page = response.context['page']
-        self.assertEquals(list(sorted(page.object_list,
+        self.assertEqual(list(sorted(page.object_list,
                                       key=lambda x:unicode(x).lower())),
                           page.object_list)
 
         # reversed name
         response = c.get(self.url, {'sort': '-name__lower'})
         page = response.context['page']
-        self.assertEquals(list(sorted(page.object_list,
+        self.assertEqual(list(sorted(page.object_list,
                                       reverse=True,
                                       key=lambda x:unicode(x).lower())),
                           page.object_list)
@@ -554,14 +558,14 @@ class SourcesAdministrationTestCase(AdministrationBaseTestCase):
         # auto approve
         response = c.get(self.url, {'sort': 'auto_approve'})
         page = response.context['page']
-        self.assertEquals(list(sorted(page.object_list,
+        self.assertEqual(list(sorted(page.object_list,
                                       key=lambda x:x.auto_approve)),
                           page.object_list)
 
         # reversed auto_approve
         response = c.get(self.url, {'sort': '-auto_approve'})
         page = response.context['page']
-        self.assertEquals(list(sorted(page.object_list,
+        self.assertEqual(list(sorted(page.object_list,
                                       reverse=True,
                                       key=lambda x:x.auto_approve)),
                           page.object_list)
@@ -569,14 +573,14 @@ class SourcesAdministrationTestCase(AdministrationBaseTestCase):
         # type (feed, search, user)
         response = c.get(self.url, {'sort': 'type'})
         page = response.context['page']
-        self.assertEquals(list(sorted(page.object_list,
+        self.assertEqual(list(sorted(page.object_list,
                                       key=lambda x:x.source_type().lower())),
                           page.object_list)
 
         # reversed type (user, search, feed)
         response = c.get(self.url, {'sort': '-type'})
         page = response.context['page']
-        self.assertEquals(list(sorted(page.object_list,
+        self.assertEqual(list(sorted(page.object_list,
                                       reverse=True,
                                       key=lambda x:x.source_type().lower())),
                           page.object_list)
@@ -593,7 +597,7 @@ class SourcesAdministrationTestCase(AdministrationBaseTestCase):
         # search filter
         response = c.get(self.url, {'filter': 'search'})
         page = response.context['page']
-        self.assertEquals(
+        self.assertEqual(
             list(page.object_list),
             list(SavedSearch.objects.extra({
                         'name__lower': 'LOWER(query_string)'}).order_by(
@@ -602,14 +606,14 @@ class SourcesAdministrationTestCase(AdministrationBaseTestCase):
         # feed filter (ignores feeds that represent video service users)
         response = c.get(self.url, {'filter': 'feed'})
         page = response.context['page']
-        self.assertEquals(len(page.object_list), 4)
+        self.assertEqual(len(page.object_list), 4)
         for feed in page.object_list:
             self.assertTrue(feed.video_service() is None)
 
         # user filter (only includes feeds that represent video service users)
         response = c.get(self.url, {'filter': 'user'})
         page = response.context['page']
-        self.assertEquals(len(page.object_list), 6)
+        self.assertEqual(len(page.object_list), 6)
         for feed in page.object_list:
             self.assertTrue(feed.video_service() is not None)
 
@@ -634,11 +638,11 @@ class SourcesAdministrationTestCase(AdministrationBaseTestCase):
         self.assertStatusCodeEquals(POST_response, 200)
         self.assertTrue(POST_response.context['formset'].is_bound)
         self.assertFalse(POST_response.context['formset'].is_valid())
-        self.assertEquals(len(POST_response.context['formset'].errors[0]), 2)
-        self.assertEquals(len(POST_response.context['formset'].errors[1]), 1)
+        self.assertEqual(len(POST_response.context['formset'].errors[0]), 2)
+        self.assertEqual(len(POST_response.context['formset'].errors[1]), 1)
 
         # make sure the data hasn't changed
-        self.assertEquals(POST_data,
+        self.assertEqual(POST_data,
                           self._POST_data_from_formset(
                 POST_response.context['formset']))
 
@@ -669,7 +673,7 @@ class SourcesAdministrationTestCase(AdministrationBaseTestCase):
         POST_response = c.post(self.url, POST_data,
                                follow=True)
         self.assertStatusCodeEquals(POST_response, 200)
-        self.assertEquals(POST_response.redirect_chain,
+        self.assertEqual(POST_response.redirect_chain,
                           [('http://%s%s?successful' % (
                         'testserver',
                         self.url), 302)])
@@ -677,14 +681,14 @@ class SourcesAdministrationTestCase(AdministrationBaseTestCase):
 
         # make sure the data has been updated
         feed = Feed.objects.get(pk=feed.pk)
-        self.assertEquals(feed.name, POST_data['form-0-name'])
-        self.assertEquals(feed.feed_url, POST_data['form-0-feed_url'])
-        self.assertEquals(feed.webpage, POST_data['form-0-webpage'])
+        self.assertEqual(feed.name, POST_data['form-0-name'])
+        self.assertEqual(feed.feed_url, POST_data['form-0-feed_url'])
+        self.assertEqual(feed.webpage, POST_data['form-0-webpage'])
         self.assertFalse(feed.has_thumbnail)
 
         search = SavedSearch.objects.get(
             pk=POST_data['form-1-id'].split('-')[1])
-        self.assertEquals(search.query_string,
+        self.assertEqual(search.query_string,
                           POST_data['form-1-query_string'])
         self.assertTrue(search.has_thumbnail)
 
@@ -705,7 +709,7 @@ class SourcesAdministrationTestCase(AdministrationBaseTestCase):
         POST_response = c.post(self.url+"?page=2", POST_data,
                                follow=True)
         self.assertStatusCodeEquals(POST_response, 200)
-        self.assertEquals(POST_response.redirect_chain,
+        self.assertEqual(POST_response.redirect_chain,
                           [('http://%s%s?page=2&successful' % (
                         'testserver',
                         self.url), 302)])
@@ -740,21 +744,21 @@ class SourcesAdministrationTestCase(AdministrationBaseTestCase):
 
         POST_response = c.post(self.url, POST_data)
         self.assertStatusCodeEquals(POST_response, 302)
-        self.assertEquals(POST_response['Location'],
+        self.assertEqual(POST_response['Location'],
                           'http://%s%s?successful' % (
                 'testserver',
                 self.url))
 
-        self.assertEquals(
+        self.assertEqual(
             Feed.objects.filter(pk=3).count(), # form 0
             0)
 
-        self.assertEquals(
+        self.assertEqual(
             SavedSearch.objects.filter(pk=8).count(), # form 1
             0)
 
         # make sure the 10 videos got removed
-        self.assertEquals(Video.objects.count(),
+        self.assertEqual(Video.objects.count(),
                           video_count - 10)
 
     def test_POST_delete_keep_videos(self):
@@ -787,21 +791,21 @@ class SourcesAdministrationTestCase(AdministrationBaseTestCase):
 
         POST_response = c.post(self.url, POST_data)
         self.assertStatusCodeEquals(POST_response, 302)
-        self.assertEquals(POST_response['Location'],
+        self.assertEqual(POST_response['Location'],
                           'http://%s%s?successful' % (
                 'testserver',
                 self.url))
 
-        self.assertEquals(
+        self.assertEqual(
             Feed.objects.filter(pk=3).count(), # form 0
             0)
 
-        self.assertEquals(
+        self.assertEqual(
             SavedSearch.objects.filter(pk=8).count(), # form 1
             0)
 
         # make sure the 10 videos are still there
-        self.assertEquals(Video.objects.count(),
+        self.assertEqual(Video.objects.count(),
                           video_count)
 
     def test_POST_bulk_edit(self):
@@ -830,7 +834,7 @@ class SourcesAdministrationTestCase(AdministrationBaseTestCase):
 
         POST_response = c.post(self.url, POST_data)
         self.assertStatusCodeEquals(POST_response, 302)
-        self.assertEquals(POST_response['Location'],
+        self.assertEqual(POST_response['Location'],
                           'http://%s%s?successful' % (
                 'testserver',
                 self.url))
@@ -838,18 +842,18 @@ class SourcesAdministrationTestCase(AdministrationBaseTestCase):
         feed = Feed.objects.get(pk=3) # form 0
         saved_search = SavedSearch.objects.get(pk=8) # form 1
 
-        self.assertEquals(feed.auto_approve, True)
-        self.assertEquals(saved_search.auto_approve, True)
-        self.assertEquals(
+        self.assertEqual(feed.auto_approve, True)
+        self.assertEqual(saved_search.auto_approve, True)
+        self.assertEqual(
             set(feed.auto_categories.values_list('pk', flat=True)),
             set([1, 2]))
-        self.assertEquals(
+        self.assertEqual(
             set(saved_search.auto_categories.values_list('pk', flat=True)),
             set([1, 2]))
-        self.assertEquals(
+        self.assertEqual(
             set(feed.auto_authors.values_list('pk', flat=True)),
             set([1, 2]))
-        self.assertEquals(
+        self.assertEqual(
             set(saved_search.auto_authors.values_list('pk', flat=True)),
             set([1, 2]))
 
@@ -884,21 +888,21 @@ class SourcesAdministrationTestCase(AdministrationBaseTestCase):
 
         POST_response = c.post(self.url, POST_data)
         self.assertStatusCodeEquals(POST_response, 302)
-        self.assertEquals(POST_response['Location'],
+        self.assertEqual(POST_response['Location'],
                           'http://%s%s?successful' % (
                 'testserver',
                 self.url))
 
-        self.assertEquals(
+        self.assertEqual(
             Feed.objects.filter(pk=3).count(), # form 0
             0)
 
-        self.assertEquals(
+        self.assertEqual(
             SavedSearch.objects.filter(pk=8).count(), # form 1
             0)
 
         # make sure the 10 videos got removed
-        self.assertEquals(Video.objects.count(),
+        self.assertEqual(Video.objects.count(),
                           video_count - 10)
 
     def test_POST_bulk_delete_keep_videos(self):
@@ -933,21 +937,21 @@ class SourcesAdministrationTestCase(AdministrationBaseTestCase):
 
         POST_response = c.post(self.url, POST_data)
         self.assertStatusCodeEquals(POST_response, 302)
-        self.assertEquals(POST_response['Location'],
+        self.assertEqual(POST_response['Location'],
                           'http://%s%s?successful' % (
                 'testserver',
                 self.url))
 
-        self.assertEquals(
+        self.assertEqual(
             Feed.objects.filter(pk=3).count(), # form 0
             0)
 
-        self.assertEquals(
+        self.assertEqual(
             SavedSearch.objects.filter(pk=8).count(), # form 1
             0)
 
         # make sure the 10 videos got removed
-        self.assertEquals(Video.objects.count(),
+        self.assertEqual(Video.objects.count(),
                           video_count)
 
     def test_POST_switching_categories_authors(self):
@@ -1002,64 +1006,64 @@ class SourcesAdministrationTestCase(AdministrationBaseTestCase):
 
         POST_response = c.post(self.url, POST_data)
         self.assertStatusCodeEquals(POST_response, 302)
-        self.assertEquals(POST_response['Location'],
+        self.assertEqual(POST_response['Location'],
                           'http://%s%s?successful' % (
                 'testserver',
                 self.url))
 
         for v in Video.objects.order_by('pk')[:3]:
-            self.assertEquals(v.feed, feed)
+            self.assertEqual(v.feed, feed)
             if v.pk == 1:
                 # nothing changed
-                self.assertEquals(
+                self.assertEqual(
                     set(v.categories.all()),
                     set([category]))
-                self.assertEquals(
+                self.assertEqual(
                     set(v.authors.all()),
                     set([user]))
             elif v.pk == 2:
                 # user changed
-                self.assertEquals(
+                self.assertEqual(
                     set(v.categories.all()),
                     set([category]))
-                self.assertEquals(
+                self.assertEqual(
                     set(v.authors.all()),
                     set([user2]))
             elif v.pk == 3:
                 # category changed
-                self.assertEquals(
+                self.assertEqual(
                     set(v.categories.all()),
                     set([category2]))
-                self.assertEquals(
+                self.assertEqual(
                     set(v.authors.all()),
                     set([user]))
             else:
                 self.fail('invalid feed video pk: %i' % v.pk)
 
         for v in Video.objects.order_by('pk')[3:6]:
-            self.assertEquals(v.search, saved_search)
+            self.assertEqual(v.search, saved_search)
             if v.pk == 4:
                 # nothing changed
-                self.assertEquals(
+                self.assertEqual(
                     set(v.categories.all()),
                     set([category]))
-                self.assertEquals(
+                self.assertEqual(
                     set(v.authors.all()),
                     set([user]))
             elif v.pk == 5:
                 # user changed
-                self.assertEquals(
+                self.assertEqual(
                     set(v.categories.all()),
                     set([category]))
-                self.assertEquals(
+                self.assertEqual(
                     set(v.authors.all()),
                     set([user2]))
             elif v.pk == 6:
                 # category changed
-                self.assertEquals(
+                self.assertEqual(
                     set(v.categories.all()),
                     set([category2]))
-                self.assertEquals(
+                self.assertEqual(
                     set(v.authors.all()),
                     set([user]))
             else:
@@ -1076,17 +1080,6 @@ class FeedAdministrationTestCase(BaseTestCase):
     url = reverse('localtv_admin_feed_add')
     feed_url = "http://participatoryculture.org/feeds_test/feed7.rss"
 
-    def test_authentication_done(self):
-        """
-        The localtv_admin_feed_add_done view should require administration
-        priviledges.
-        """
-        url = reverse('localtv_admin_feed_add_done', args=[1])
-        self.assertRequiresAuthentication(url)
-
-        self.assertRequiresAuthentication(url,
-                                          username='user', password='password')
-
     def test_GET(self):
         """
         A GET request to the add_feed view should render the
@@ -1099,11 +1092,11 @@ class FeedAdministrationTestCase(BaseTestCase):
         c.login(username='admin', password='admin')
         response = c.get(self.url, {'feed_url': self.feed_url})
         self.assertStatusCodeEquals(response, 200)
-        self.assertEquals(response.template[0].name,
+        self.assertEqual(response.template[0].name,
                           'localtv/admin/add_feed.html')
         self.assertTrue(response.context[2]['form'].instance.feed_url,
                         self.feed_url)
-        self.assertEquals(response.context[2]['video_count'], 1)
+        self.assertEqual(response.context[2]['video_count'], 1)
 
     def test_GET_fail_existing(self):
         """
@@ -1125,19 +1118,22 @@ class FeedAdministrationTestCase(BaseTestCase):
         We accept a few different kinds of YouTube URLs.  We should make sure
         we only have one feed per base URL.
         """
-        url1 = ('http://gdata.youtube.com/feeds/base/users/CLPPrj/uploads?'
-                'alt=rss&v=2&orderby=published')
-        url2 = 'http://www.youtube.com/rss/user/CLPPrj/videos.rss'
+        urls = [
+            ('http://gdata.youtube.com/feeds/base/users/CLPPrj/uploads?'
+             'alt=rss&v=2'),
+            ('http://gdata.youtube.com/feeds/base/users/CLPPrj/uploads?'
+             'alt=rss&v=2&orderby=published'),
+            'http://www.youtube.com/rss/user/CLPPrj/videos.rss']
         Feed.objects.create(
             site=self.site_location.site,
             last_updated=datetime.datetime.now(),
             status=Feed.UNAPPROVED,
-            feed_url=url1)
+            feed_url=urls[0])
         c = Client()
         c.login(username='admin', password='admin')
-        for url in url1, url2:
+        for url in urls:
             response = c.get(self.url, {'feed_url': url})
-            self.assertEquals(response.status_code, 400,
+            self.assertEqual(response.status_code, 400,
                               '%r not stopped as a duplicate' % url)
 
     def test_GET_vimeo(self):
@@ -1151,7 +1147,7 @@ class FeedAdministrationTestCase(BaseTestCase):
         c.login(username='admin', password='admin')
         response = c.get(self.url, {'feed_url': url})
         self.assertStatusCodeEquals(response, 200)
-        self.assertEquals(response.template[0].name,
+        self.assertEqual(response.template[0].name,
                           'localtv/admin/add_feed.html')
         self.assertTrue(response.context[2]['form'].instance.feed_url,
                         url)
@@ -1167,7 +1163,7 @@ class FeedAdministrationTestCase(BaseTestCase):
         c.login(username='admin', password='admin')
         response = c.get(self.url, {'feed_url': url})
         self.assertStatusCodeEquals(response, 200)
-        self.assertEquals(response.template[0].name,
+        self.assertEqual(response.template[0].name,
                           'localtv/admin/add_feed.html')
         self.assertTrue(response.context[2]['form'].instance.feed_url,
                         url)
@@ -1183,12 +1179,12 @@ class FeedAdministrationTestCase(BaseTestCase):
                           {'feed_url': self.feed_url,
                            'auto_categories': [1]})
         self.assertStatusCodeEquals(response, 200)
-        self.assertEquals(response.template[0].name,
+        self.assertEqual(response.template[0].name,
                           'localtv/admin/add_feed.html')
         self.assertTrue(response.context[0]['form'].instance.feed_url,
                         self.feed_url)
         self.assertFalse(response.context[0]['form'].is_valid())
-        self.assertEquals(response.context[0]['video_count'], 1)
+        self.assertEqual(response.context[0]['video_count'], 1)
 
     def test_POST_failure_bad_url(self):
         """
@@ -1215,17 +1211,17 @@ class FeedAdministrationTestCase(BaseTestCase):
                            'auto_approve': 'yes',
                            'cancel': 'yes'})
         self.assertStatusCodeEquals(response, 302)
-        self.assertEquals(response['Location'],
+        self.assertEqual(response['Location'],
                           'http://%s%s' % (
                 'testserver',
                 reverse('localtv_admin_manage_page')))
 
-        self.assertEquals(Feed.objects.count(), 0)
+        self.assertEqual(Feed.objects.count(), 0)
 
     def test_POST_succeed(self):
         """
         A POST request to the add_feed view with a valid form should redirect
-        the user to the localtv_admin_add_feed_done view.
+        the user to the localtv_admin_manage_page view.
 
         A Feed object should also be created, but not have any items.
         """
@@ -1236,38 +1232,18 @@ class FeedAdministrationTestCase(BaseTestCase):
                            'auto_approve': 'yes',
                            'avoid_frontpage': 'on'})
         self.assertStatusCodeEquals(response, 302)
-        self.assertEquals(response['Location'],
+        self.assertEqual(response['Location'],
                           'http://%s%s' % (
                 'testserver',
-                reverse('localtv_admin_feed_add_done', args=[1])))
+                reverse('localtv_admin_manage_page')))
 
         feed = Feed.objects.get()
-        self.assertEquals(feed.name, 'Valid Feed with Relative Links')
-        self.assertEquals(feed.feed_url, self.feed_url)
-        self.assertEquals(feed.status, Feed.UNAPPROVED)
-        self.assertEquals(feed.avoid_frontpage, True)
+        self.assertEqual(feed.name, 'Valid Feed with Relative Links')
+        self.assertEqual(feed.feed_url, self.feed_url)
+        # if CELERY_ALWAYS_EAGER is True, we'll have imported the feed here
+        self.assertTrue(feed.status in (Feed.UNAPPROVED, Feed.ACTIVE))
+        self.assertEqual(feed.avoid_frontpage, True)
         self.assertTrue(feed.auto_approve)
-
-    def test_GET_done(self):
-        """
-        A GET request to the add_feed_done view should start importing the
-        videos from the feed by starting a Celery task.  It should also render
-        the 'localtv/admin/feed_wait.html' template and have a 'feed' variable
-        in the context pointing to the Feed object and a 'task_id' variable
-        with the Celery task ID..
-        """
-        c = Client()
-        c.login(username='admin', password='admin')
-        c.post(self.url + "?feed_url=%s" % self.feed_url,
-               {'feed_url': self.feed_url,
-                'auto_approve': 'yes'})
-
-        response = c.get(reverse('localtv_admin_feed_add_done', args=[1]))
-        self.assertStatusCodeEquals(response, 302)
-        self.assertTrue(response['Location'].startswith(
-                'http://%s%s?task_id=' % (
-                    'testserver',
-                    reverse('localtv_admin_feed_add_done', args=[1]))))
 
     def test_GET_creates_user(self):
         """
@@ -1285,14 +1261,14 @@ class FeedAdministrationTestCase(BaseTestCase):
 
         feed = Feed.objects.get()
         user = User.objects.get(username='mphtower')
-        self.assertEquals(feed.name, 'mphtower')
+        self.assertEqual(feed.name, 'mphtower')
 
         self.assertFalse(user.has_usable_password())
-        self.assertEquals(user.email, '')
-        self.assertEquals(user.get_profile().website,
-                          'http://www.youtube.com/profile_videos?'
-                          'user=mphtower')
-        self.assertEquals(list(feed.auto_authors.all()),
+        self.assertEqual(user.email, '')
+        self.assertEqual(user.get_profile().website,
+                          'http://www.youtube.com/profile?'
+                          'user=mphtower#p/u')
+        self.assertEqual(list(feed.auto_authors.all()),
                           [user])
 
     def test_GET_reuses_existing_user(self):
@@ -1316,12 +1292,12 @@ class FeedAdministrationTestCase(BaseTestCase):
 
         user = User.objects.get(username='mphtower') # reload user
         self.assertTrue(user.has_usable_password())
-        self.assertEquals(user.email, 'mph@tower.com')
-        self.assertEquals(user.get_profile().website,
+        self.assertEqual(user.email, 'mph@tower.com')
+        self.assertEqual(user.get_profile().website,
                           'http://www.mphtower.com/')
 
         feed = Feed.objects.get()
-        self.assertEquals(list(feed.auto_authors.all()),
+        self.assertEqual(list(feed.auto_authors.all()),
                           [user])
 
     def test_GET_auto_approve(self):
@@ -1346,9 +1322,9 @@ class FeedAdministrationTestCase(BaseTestCase):
         c.login(username='admin', password='admin')
         response = c.get(url,
                          HTTP_REFERER='http://www.google.com/')
-        self.assertEquals(feed.auto_approve, False)
+        self.assertEqual(feed.auto_approve, False)
         self.assertStatusCodeEquals(response, 302)
-        self.assertEquals(response['Location'], 'http://www.google.com/')
+        self.assertEqual(response['Location'], 'http://www.google.com/')
 
     def test_GET_auto_approve_disable(self):
         """
@@ -1368,9 +1344,9 @@ class FeedAdministrationTestCase(BaseTestCase):
         c.login(username='admin', password='admin')
         response = c.get(url, {'disable': 'yes'},
                          HTTP_REFERER='http://www.google.com/')
-        self.assertEquals(feed.auto_approve, True)
+        self.assertEqual(feed.auto_approve, True)
         self.assertStatusCodeEquals(response, 302)
-        self.assertEquals(response['Location'], 'http://www.google.com/')
+        self.assertEqual(response['Location'], 'http://www.google.com/')
 
 
 # -----------------------------------------------------------------------------
@@ -1397,7 +1373,7 @@ class SearchAdministrationTestCase(AdministrationBaseTestCase):
         c.login(username='admin', password='admin')
         response = c.get(self.url)
         self.assertStatusCodeEquals(response, 200)
-        self.assertEquals(response.template[0].name,
+        self.assertEqual(response.template[0].name,
                           'localtv/admin/livesearch_table.html')
         self.assertTrue('current_video' in response.context[0])
         self.assertTrue('page_obj' in response.context[0])
@@ -1407,41 +1383,41 @@ class SearchAdministrationTestCase(AdministrationBaseTestCase):
 
     def test_GET_query(self):
         """
-        A GET request to the livesearch view and GET['query'] argument should
-        list some videos that match the query.
+        A GET request to the livesearch view and GET['q'] argument should list
+        some videos that match the query.
         """
         c = Client()
         c.login(username='admin', password='admin')
         response = c.get(self.url,
-                         {'query': 'search string'})
+                         {'q': 'search string'})
         self.assertStatusCodeEquals(response, 200)
-        self.assertEquals(response.template[0].name,
+        self.assertEqual(response.template[0].name,
                           'localtv/admin/livesearch_table.html')
-        self.assertIsInstance(response.context[2]['current_video'],
-                              MetasearchVideo)
-        self.assertEquals(response.context[2]['page_obj'].number, 1)
-        self.assertEquals(len(response.context[2]['page_obj'].object_list), 10)
-        self.assertEquals(response.context[2]['query_string'], 'search string')
-        self.assertEquals(response.context[2]['order_by'], 'latest')
-        self.assertEquals(response.context[2]['is_saved_search'], False)
+        self.assertIsInstance(response.context['current_video'],
+                              Video)
+        self.assertEqual(response.context['page_obj'].number, 1)
+        self.assertEqual(len(response.context['page_obj'].object_list), 10)
+        self.assertEqual(response.context['query_string'], 'search string')
+        self.assertEqual(response.context['order_by'], 'latest')
+        self.assertEqual(response.context['is_saved_search'], False)
 
     def test_GET_query_pagination(self):
         """
-        A GET request to the livesearch view with GET['query'] and GET['page']
+        A GET request to the livesearch view with GET['q'] and GET['page']
         arguments should return another page of results.
         """
         c = Client()
         c.login(username='admin', password='admin')
         response = c.get(self.url,
-                         {'query': 'search string'})
-        self.assertEquals(response.context[2]['page_obj'].number, 1)
-        self.assertEquals(len(response.context[2]['page_obj'].object_list), 10)
+                         {'q': 'search string'})
+        self.assertEqual(response.context[2]['page_obj'].number, 1)
+        self.assertEqual(len(response.context[2]['page_obj'].object_list), 10)
 
         response2 = c.get(self.url,
-                         {'query': 'search string',
+                         {'q': 'search string',
                           'page': '2'})
-        self.assertEquals(response2.context[2]['page_obj'].number, 2)
-        self.assertEquals(len(response2.context[2]['page_obj'].object_list),
+        self.assertEqual(response2.context[2]['page_obj'].number, 2)
+        self.assertEqual(len(response2.context[2]['page_obj'].object_list),
                           10)
 
         self.assertNotEquals([v.id for v in
@@ -1457,40 +1433,37 @@ class SearchAdministrationTestCase(AdministrationBaseTestCase):
         removed from subsequent search listings.
         """
         c = Client()
-        self.assert_(c.login(username='admin', password='admin'))
+        self.assertTrue(c.login(username='admin', password='admin'))
         response = c.get(self.url,
-                         {'query': 'search string'})
-        metasearch_video = response.context[2]['page_obj'].object_list[0]
-        metasearch_video2 = response.context[2]['page_obj'].object_list[1]
+                         {'q': 'search string'})
+        fake_video = response.context[2]['page_obj'].object_list[0]
+        fake_video2 = response.context[2]['page_obj'].object_list[1]
 
         response = c.get(reverse('localtv_admin_search_video_approve'),
-                         {'query': 'search string',
-                          'video_id': metasearch_video.id},
+                         {'q': 'search string',
+                          'video_id': fake_video.id},
                          HTTP_REFERER="http://www.getmiro.com/")
         self.assertStatusCodeEquals(response, 302)
-        self.assertEquals(response['Location'], "http://www.getmiro.com/")
+        self.assertEqual(response['Location'], "http://www.getmiro.com/")
 
         v = Video.objects.get()
-        self.assertEquals(v.site, self.site_location.site)
-        self.assertEquals(v.name, metasearch_video.name)
-        self.assertEquals(
-            v.description,
-            vidscraper.auto_scrape(v.website_url,
-                                   fields=['description'])['description'])
-        self.assertEquals(v.file_url, metasearch_video.file_url)
-        self.assertEquals(v.embed_code, metasearch_video.embed_code)
+        self.assertEqual(v.site, self.site_location.site)
+        self.assertEqual(v.name, fake_video.name)
+        self.assertEqual(v.description, fake_video.description)
+        self.assertEqual(v.file_url, fake_video.file_url)
+        self.assertEqual(v.embed_code, fake_video.embed_code)
         self.assertTrue(v.last_featured is None)
 
         user = User.objects.get(username=v.video_service_user)
         self.assertFalse(user.has_usable_password())
-        self.assertEquals(user.get_profile().website,
+        self.assertEqual(user.get_profile().website,
                           v.video_service_url)
-        self.assertEquals(list(v.authors.all()), [user])
+        self.assertEqual(list(v.authors.all()), [user])
 
         response = c.get(self.url,
-                         {'query': 'search string'})
-        self.assertEquals(response.context[2]['page_obj'].object_list[0].id,
-                          metasearch_video2.id)
+                         {'q': 'search string'})
+        self.assertEqual(response.context[2]['page_obj'].object_list[0].id,
+                          fake_video2.id)
 
     @mock.patch('localtv.tiers.Tier.can_add_more_videos', mock.Mock(return_value=False))
     def test_GET_approve_refuses_when_limit_exceeded(self):
@@ -1502,12 +1475,12 @@ class SearchAdministrationTestCase(AdministrationBaseTestCase):
         c = Client()
         c.login(username='admin', password='admin')
         response = c.get(self.url,
-                         {'query': 'search string'})
+                         {'q': 'search string'})
         metasearch_video = response.context[2]['page_obj'].object_list[0]
         metasearch_video2 = response.context[2]['page_obj'].object_list[1]
 
         response = c.get(reverse('localtv_admin_search_video_approve'),
-                         {'query': 'search string',
+                         {'q': 'search string',
                           'video_id': metasearch_video.id},
                          HTTP_REFERER="http://www.getmiro.com/")
         self.assertStatusCodeEquals(response, 402)
@@ -1532,16 +1505,16 @@ class SearchAdministrationTestCase(AdministrationBaseTestCase):
         c = Client()
         c.login(username='admin', password='admin')
         response = c.get(self.url,
-                         {'query': 'search string'})
+                         {'q': 'search string'})
         metasearch_video = response.context[2]['page_obj'].object_list[0]
 
         response = c.get(reverse('localtv_admin_search_video_approve'),
-                         {'query': 'search string',
+                         {'q': 'search string',
                           'feature': 'yes',
                           'video_id': metasearch_video.id},
                          HTTP_REFERER="http://www.getmiro.com/")
         self.assertStatusCodeEquals(response, 302)
-        self.assertEquals(response['Location'], "http://www.getmiro.com/")
+        self.assertEqual(response['Location'], "http://www.getmiro.com/")
 
         v = Video.objects.get()
         self.assertTrue(v.last_featured is not None)
@@ -1555,16 +1528,16 @@ class SearchAdministrationTestCase(AdministrationBaseTestCase):
         c = Client()
         c.login(username='admin', password='admin')
         response = c.get(self.url,
-                         {'query': 'search string'})
+                         {'q': 'search string'})
         metasearch_video = response.context[2]['page_obj'].object_list[0]
 
         response = c.get(reverse('localtv_admin_search_video_display'),
-                         {'query': 'search string',
+                         {'q': 'search string',
                           'video_id': metasearch_video.id})
         self.assertStatusCodeEquals(response, 200)
-        self.assertEquals(response.template[0].name,
+        self.assertEqual(response.template[0].name,
                           'localtv/admin/video_preview.html')
-        self.assertEquals(response.context[0]['current_video'].id,
+        self.assertEqual(response.context[0]['current_video'].id,
                           metasearch_video.id)
 
     def test_GET_create_saved_search(self):
@@ -1576,18 +1549,18 @@ class SearchAdministrationTestCase(AdministrationBaseTestCase):
         c = Client()
         c.login(username='admin', password='admin')
         response = c.get(reverse('localtv_admin_search_add'),
-                         {'query': 'search string'},
+                         {'q': 'search string'},
                          HTTP_REFERER='http://www.getmiro.com/')
         self.assertStatusCodeEquals(response, 302)
-        self.assertEquals(response['Location'], 'http://www.getmiro.com/')
+        self.assertEqual(response['Location'], 'http://www.getmiro.com/')
 
         saved_search = SavedSearch.objects.get()
-        self.assertEquals(saved_search.query_string, 'search string')
-        self.assertEquals(saved_search.site, self.site_location.site)
-        self.assertEquals(saved_search.user.username, 'admin')
+        self.assertEqual(saved_search.query_string, 'search string')
+        self.assertEqual(saved_search.site, self.site_location.site)
+        self.assertEqual(saved_search.user.username, 'admin')
 
         response = c.get(self.url,
-                         {'query': 'search string'})
+                         {'q': 'search string'})
         self.assertTrue(response.context[2]['is_saved_search'])
 
     def test_GET_create_saved_search_authentication(self):
@@ -1617,7 +1590,7 @@ class SearchAdministrationTestCase(AdministrationBaseTestCase):
                                  args=[saved_search.pk]),
                          HTTP_REFERER='http://www.getmiro.com/')
         self.assertStatusCodeEquals(response, 302)
-        self.assertEquals(response['Location'],
+        self.assertEqual(response['Location'],
                           'http://www.getmiro.com/')
 
         saved_search = SavedSearch.objects.get(pk=saved_search.pk)
@@ -1653,7 +1626,7 @@ class SearchAdministrationTestCase(AdministrationBaseTestCase):
                                  {'disable': 'yes'},
                          HTTP_REFERER='http://www.getmiro.com/')
         self.assertStatusCodeEquals(response, 302)
-        self.assertEquals(response['Location'],
+        self.assertEqual(response['Location'],
                           'http://www.getmiro.com/')
 
         saved_search = SavedSearch.objects.get(pk=saved_search.pk)
@@ -1678,7 +1651,7 @@ class UserAdministrationTestCase(AdministrationBaseTestCase):
         c.login(username='admin', password='admin')
         response = c.get(self.url)
         self.assertStatusCodeEquals(response, 200)
-        self.assertEquals(response.template[0].name,
+        self.assertEqual(response.template[0].name,
                           'localtv/admin/users.html')
         self.assertTrue('formset' in response.context[0])
         self.assertTrue('add_user_form' in response.context[0])
@@ -1694,7 +1667,7 @@ class UserAdministrationTestCase(AdministrationBaseTestCase):
         response = c.post(self.url,
                           {'submit': 'Add'})
         self.assertStatusCodeEquals(response, 200)
-        self.assertEquals(response.template[0].name,
+        self.assertEqual(response.template[0].name,
                           'localtv/admin/users.html')
         self.assertTrue('formset' in response.context[0])
         self.assertTrue(
@@ -1711,7 +1684,7 @@ class UserAdministrationTestCase(AdministrationBaseTestCase):
         c.login(username='admin', password='admin')
         response = c.get(self.url)
         self.assertStatusCodeEquals(response, 200)
-        self.assertEquals(response.template[0].name,
+        self.assertEqual(response.template[0].name,
                           'localtv/admin/users.html')
         self.assertTrue(
             getattr(response.context[0]['formset'], 'errors') is not None)
@@ -1735,7 +1708,7 @@ class UserAdministrationTestCase(AdministrationBaseTestCase):
             }
         response = c.post(self.url, POST_data)
         self.assertStatusCodeEquals(response, 302)
-        self.assertEquals(response['Location'],
+        self.assertEqual(response['Location'],
                           'http://%s%s' % (
                 'testserver',
                 self.url))
@@ -1748,7 +1721,7 @@ class UserAdministrationTestCase(AdministrationBaseTestCase):
                 new_site_location = SiteLocation.objects.get()
                 self.assertFalse(new_site_location.user_is_admin(new))
             else:
-                self.assertEquals(getattr(new, key), value)
+                self.assertEqual(getattr(new, key), value)
 
         self.assertFalse(new.has_usable_password())
 
@@ -1771,7 +1744,7 @@ class UserAdministrationTestCase(AdministrationBaseTestCase):
             }
         response = c.post(self.url, POST_data)
         self.assertStatusCodeEquals(response, 302)
-        self.assertEquals(response['Location'],
+        self.assertEqual(response['Location'],
                           'http://%s%s' % (
                 'testserver',
                 self.url))
@@ -1784,7 +1757,7 @@ class UserAdministrationTestCase(AdministrationBaseTestCase):
                 new_site_location = SiteLocation.objects.get()
                 self.assertTrue(new_site_location.user_is_admin(new))
             else:
-                self.assertEquals(getattr(new, key), value)
+                self.assertEqual(getattr(new, key), value)
 
         self.assertTrue(new.check_password(POST_data['password_f']))
 
@@ -1814,15 +1787,15 @@ class UserAdministrationTestCase(AdministrationBaseTestCase):
                 formset,
                 submit='Save'))
         self.assertStatusCodeEquals(POST_response, 302)
-        self.assertEquals(POST_response['Location'],
+        self.assertEqual(POST_response['Location'],
                           'http://%s%s' % (
                 'testserver',
                 self.url))
 
         for old, new in zip(old_users, User.objects.values()):
-            self.assertEquals(old, new)
+            self.assertEqual(old, new)
         for old, new in zip(old_profiles, Profile.objects.values()):
-            self.assertEquals(old, new)
+            self.assertEqual(old, new)
 
     def test_POST_save_changes(self):
         """
@@ -1854,36 +1827,36 @@ class UserAdministrationTestCase(AdministrationBaseTestCase):
 
         POST_response = c.post(self.url, POST_data)
         self.assertStatusCodeEquals(POST_response, 302)
-        self.assertEquals(POST_response['Location'],
+        self.assertEqual(POST_response['Location'],
                           'http://%s%s' % (
                 'testserver',
                 self.url))
 
-        self.assertEquals(User.objects.count(), 4) # no one got added
+        self.assertEqual(User.objects.count(), 4) # no one got added
 
         new_admin = User.objects.get(username='new_admin')
-        self.assertEquals(new_admin.pk, 1)
+        self.assertEqual(new_admin.pk, 1)
         self.assertTrue(self.site_location.user_is_admin(new_admin))
         self.assertTrue(new_admin.check_password('new_admin'))
-        self.assertEquals(new_admin.get_profile().location, 'New Location')
+        self.assertEqual(new_admin.get_profile().location, 'New Location')
 
         superuser = User.objects.get(username='superuser')
-        self.assertEquals(superuser.pk, 2)
-        self.assertEquals(superuser.is_superuser, True)
-        self.assertEquals(superuser.first_name, '')
-        self.assertEquals(superuser.last_name, '')
+        self.assertEqual(superuser.pk, 2)
+        self.assertEqual(superuser.is_superuser, True)
+        self.assertEqual(superuser.first_name, '')
+        self.assertEqual(superuser.last_name, '')
         self.assertFalse(superuser in self.site_location.admins.all())
         self.assertTrue(superuser.check_password('superuser'))
         profile = superuser.get_profile()
         self.assertTrue(profile.logo.name.endswith('logo.png'))
-        self.assertEquals(profile.website,
+        self.assertEqual(profile.website,
                           'http://google.com/ http://twitter.com/')
-        self.assertEquals(profile.description, 'Superuser Description')
+        self.assertEqual(profile.description, 'Superuser Description')
 
         old_admin = User.objects.get(username='admin')
-        self.assertEquals(old_admin.pk, 3)
-        self.assertEquals(old_admin.first_name, 'NewFirst')
-        self.assertEquals(old_admin.last_name, 'NewLast')
+        self.assertEqual(old_admin.pk, 3)
+        self.assertEqual(old_admin.first_name, 'NewFirst')
+        self.assertEqual(old_admin.last_name, 'NewLast')
         self.assertFalse(self.site_location.user_is_admin(old_admin))
         self.assertTrue(old_admin.check_password('admin'))
 
@@ -1909,15 +1882,15 @@ class UserAdministrationTestCase(AdministrationBaseTestCase):
 
         POST_response = c.post(self.url, POST_data)
         self.assertStatusCodeEquals(POST_response, 302)
-        self.assertEquals(POST_response['Location'],
+        self.assertEqual(POST_response['Location'],
                           'http://%s%s' % (
                 'testserver',
                 self.url))
 
-        self.assertEquals(User.objects.count(), 3) # one user got removed
+        self.assertEqual(User.objects.count(), 3) # one user got removed
 
-        self.assertEquals(User.objects.filter(username='user').count(), 0)
-        self.assertEquals(User.objects.filter(is_superuser=True).count(), 1)
+        self.assertEqual(User.objects.filter(username='user').count(), 0)
+        self.assertEqual(User.objects.filter(is_superuser=True).count(), 1)
 
     def test_POST_delete_nonhuman_user(self):
         """
@@ -1950,14 +1923,14 @@ class UserAdministrationTestCase(AdministrationBaseTestCase):
 
         POST_response = c.post(self.url, POST_data)
         self.assertStatusCodeEquals(POST_response, 302)
-        self.assertEquals(POST_response['Location'],
+        self.assertEqual(POST_response['Location'],
                           'http://%s%s' % (
                 'testserver',
                 self.url))
 
-        self.assertEquals(User.objects.count(), 3) # one user got removed
+        self.assertEqual(User.objects.count(), 3) # one user got removed
 
-        self.assertEquals(User.objects.filter(username='user').count(), 0)
+        self.assertEqual(User.objects.filter(username='user').count(), 0)
 
 
 # -----------------------------------------------------------------------------
@@ -1982,7 +1955,7 @@ class CategoryAdministrationTestCase(AdministrationBaseTestCase):
         c.login(username='admin', password='admin')
         response = c.get(self.url)
         self.assertStatusCodeEquals(response, 200)
-        self.assertEquals(response.template[0].name,
+        self.assertEqual(response.template[0].name,
                           'localtv/admin/categories.html')
         self.assertTrue('formset' in response.context[0])
         self.assertTrue('add_category_form' in response.context[0])
@@ -1997,7 +1970,7 @@ class CategoryAdministrationTestCase(AdministrationBaseTestCase):
         response = c.post(self.url,
                           {'submit': 'Add'})
         self.assertStatusCodeEquals(response, 200)
-        self.assertEquals(response.template[0].name,
+        self.assertEqual(response.template[0].name,
                           'localtv/admin/categories.html')
         self.assertTrue('formset' in response.context[0])
         self.assertTrue(
@@ -2018,7 +1991,7 @@ class CategoryAdministrationTestCase(AdministrationBaseTestCase):
             }
         response = c.post(self.url, POST_data)
         self.assertStatusCodeEquals(response, 200)
-        self.assertEquals(response.template[0].name,
+        self.assertEqual(response.template[0].name,
                           'localtv/admin/categories.html')
         self.assertTrue('formset' in response.context[0])
         self.assertTrue(
@@ -2042,7 +2015,7 @@ class CategoryAdministrationTestCase(AdministrationBaseTestCase):
 
         response = c.post(self.url, POST_data)
         self.assertStatusCodeEquals(response, 200)
-        self.assertEquals(response.template[0].name,
+        self.assertEqual(response.template[0].name,
                           'localtv/admin/categories.html')
         self.assertTrue(
             getattr(response.context[0]['formset'], 'errors') is not None)
@@ -2065,7 +2038,7 @@ class CategoryAdministrationTestCase(AdministrationBaseTestCase):
 
         response = c.post(self.url, POST_data)
         self.assertStatusCodeEquals(response, 200)
-        self.assertEquals(response.template[0].name,
+        self.assertEqual(response.template[0].name,
                           'localtv/admin/categories.html')
         self.assertTrue(
             getattr(response.context[0]['formset'], 'errors') is not None)
@@ -2090,7 +2063,7 @@ class CategoryAdministrationTestCase(AdministrationBaseTestCase):
 
         response = c.post(self.url, POST_data)
         self.assertStatusCodeEquals(response, 200)
-        self.assertEquals(response.template[0].name,
+        self.assertEqual(response.template[0].name,
                           'localtv/admin/categories.html')
         self.assertTrue(
             getattr(response.context[0]['formset'], 'errors') is not None)
@@ -2114,14 +2087,14 @@ class CategoryAdministrationTestCase(AdministrationBaseTestCase):
             }
         response = c.post(self.url, POST_data)
         self.assertStatusCodeEquals(response, 302)
-        self.assertEquals(response['Location'],
+        self.assertEqual(response['Location'],
                           'http://%s%s?successful' % (
                 'testserver',
                 self.url))
 
         new = Category.objects.order_by('-id')[0]
 
-        self.assertEquals(new.site, self.site_location.site)
+        self.assertEqual(new.site, self.site_location.site)
 
         for key, value in POST_data.items():
             if key == 'submit':
@@ -2129,11 +2102,11 @@ class CategoryAdministrationTestCase(AdministrationBaseTestCase):
             elif key == 'logo':
                 new.logo.open()
                 value.seek(0)
-                self.assertEquals(new.logo.read(), value.read())
+                self.assertEqual(new.logo.read(), value.read())
             elif key == 'parent':
-                self.assertEquals(new.parent.pk, value)
+                self.assertEqual(new.parent.pk, value)
             else:
-                self.assertEquals(getattr(new, key), value)
+                self.assertEqual(getattr(new, key), value)
 
     def test_POST_save_no_changes(self):
         """
@@ -2154,13 +2127,13 @@ class CategoryAdministrationTestCase(AdministrationBaseTestCase):
                 submit='Save'))
 
         self.assertStatusCodeEquals(POST_response, 302)
-        self.assertEquals(POST_response['Location'],
+        self.assertEqual(POST_response['Location'],
                           'http://%s%s?successful' % (
                 'testserver',
                 self.url))
 
         for old, new in zip(old_categories, Category.objects.values()):
-            self.assertEquals(old, new)
+            self.assertEqual(old, new)
 
     def test_POST_save_changes(self):
         """
@@ -2184,26 +2157,26 @@ class CategoryAdministrationTestCase(AdministrationBaseTestCase):
 
         POST_response = c.post(self.url, POST_data)
         self.assertStatusCodeEquals(POST_response, 302)
-        self.assertEquals(POST_response['Location'],
+        self.assertEqual(POST_response['Location'],
                           'http://%s%s?successful' % (
                 'testserver',
                 self.url))
 
-        self.assertEquals(Category.objects.count(), 5) # no one got
+        self.assertEqual(Category.objects.count(), 5) # no one got
                                                               # added
 
         new_slug = Category.objects.get(slug='newslug')
-        self.assertEquals(new_slug.pk, 5)
-        self.assertEquals(new_slug.name, 'New Name')
+        self.assertEqual(new_slug.pk, 5)
+        self.assertEqual(new_slug.name, 'New Name')
 
         new_logo = Category.objects.get(slug='miro')
         new_logo.logo.open()
-        self.assertEquals(new_logo.logo.read(),
+        self.assertEqual(new_logo.logo.read(),
                           file(self._data_file('logo.png')).read())
-        self.assertEquals(new_logo.description, 'New Description')
+        self.assertEqual(new_logo.description, 'New Description')
 
         new_parent = Category.objects.get(slug='linux')
-        self.assertEquals(new_parent.parent.pk, 5)
+        self.assertEqual(new_parent.parent.pk, 5)
 
     def test_POST_delete(self):
         """
@@ -2225,16 +2198,16 @@ class CategoryAdministrationTestCase(AdministrationBaseTestCase):
 
         POST_response = c.post(self.url, POST_data)
         self.assertStatusCodeEquals(POST_response, 302)
-        self.assertEquals(POST_response['Location'],
+        self.assertEqual(POST_response['Location'],
                           'http://%s%s?successful' % (
                 'testserver',
                 self.url))
 
         # three categories got removed
-        self.assertEquals(Category.objects.count(), 2)
+        self.assertEqual(Category.objects.count(), 2)
 
         # both of the other categories got their parents reassigned to None
-        self.assertEquals(Category.objects.filter(parent=None).count(),
+        self.assertEqual(Category.objects.filter(parent=None).count(),
                           2)
 
     def test_POST_bulk_delete(self):
@@ -2257,17 +2230,17 @@ class CategoryAdministrationTestCase(AdministrationBaseTestCase):
 
         POST_response = c.post(self.url, POST_data)
         self.assertStatusCodeEquals(POST_response, 302)
-        self.assertEquals(POST_response['Location'],
+        self.assertEqual(POST_response['Location'],
                           'http://%s%s?successful' % (
                 'testserver',
                 self.url))
 
 
         # three categories got removed
-        self.assertEquals(Category.objects.count(), 2)
+        self.assertEqual(Category.objects.count(), 2)
 
         # both of the other categories got their parents reassigned to None
-        self.assertEquals(Category.objects.filter(parent=None).count(),
+        self.assertEqual(Category.objects.filter(parent=None).count(),
                           2)
 
 
@@ -2353,25 +2326,25 @@ class BulkEditAdministrationTestCase(AdministrationBaseTestCase):
         response = c.get(self.url)
 
         self.assertStatusCodeEquals(response, 200)
-        self.assertEquals(response.template[0].name,
+        self.assertEqual(response.template[0].name,
                           'localtv/admin/bulk_edit.html')
-        self.assertEquals(response.context[0]['page'].number, 1)
+        self.assertEqual(response.context[0]['page'].number, 1)
         self.assertTrue('formset' in response.context[0])
-        self.assertEquals(
+        self.assertEqual(
             [form.instance for form in
              response.context[0]['formset'].initial_forms],
             list(
                 self.Video_sort_lower(status=Video.ACTIVE)[:50]))
-        self.assertEquals(
+        self.assertEqual(
             [form.initial['tags'] for form in
              response.context[0]['formset'].initial_forms],
             list (edit_string_for_tags(video.tags) for video in
                   self.Video_sort_lower(status=Video.ACTIVE)[:50]))
         self.assertTrue('headers' in response.context[0])
-        self.assertEquals(list(response.context[0]['categories']),
+        self.assertEqual(list(response.context[0]['categories']),
                           list(Category.objects.filter(
                 site=self.site_location.site)))
-        self.assertEquals(list(response.context[0]['users']),
+        self.assertEqual(list(response.context[0]['users']),
                           list(User.objects.order_by('username')))
 
     def test_GET_sorting(self):
@@ -2384,14 +2357,14 @@ class BulkEditAdministrationTestCase(AdministrationBaseTestCase):
         c.login(username='admin', password='admin')
         response = c.get(self.url)
         page = response.context['page']
-        self.assertEquals(list(sorted(page.object_list,
+        self.assertEqual(list(sorted(page.object_list,
                                       key=lambda x:unicode(x).lower())),
                           list(page.object_list))
 
         # reversed name
         response = c.get(self.url, {'sort': '-name'})
         page = response.context['page']
-        self.assertEquals(list(sorted(page.object_list,
+        self.assertEqual(list(sorted(page.object_list,
                                       reverse=True,
                                       key=lambda x:unicode(x).lower())),
                           list(page.object_list))
@@ -2399,14 +2372,14 @@ class BulkEditAdministrationTestCase(AdministrationBaseTestCase):
         # auto approve
         response = c.get(self.url, {'sort': 'when_published'})
         page = response.context['page']
-        self.assertEquals(list(sorted(page.object_list,
+        self.assertEqual(list(sorted(page.object_list,
                                       key=lambda x:x.when_published)),
                           list(page.object_list))
 
         # reversed auto_approve
         response = c.get(self.url, {'sort': '-when_published'})
         page = response.context['page']
-        self.assertEquals(list(sorted(page.object_list,
+        self.assertEqual(list(sorted(page.object_list,
                                       reverse=True,
                                       key=lambda x:x.when_published)),
                           list(page.object_list))
@@ -2414,14 +2387,14 @@ class BulkEditAdministrationTestCase(AdministrationBaseTestCase):
         # source (feed, search, user)
         response = c.get(self.url, {'sort': 'source'})
         page = response.context['page']
-        self.assertEquals(list(sorted(page.object_list,
+        self.assertEqual(list(sorted(page.object_list,
                                       key=lambda x:x.source_type())),
                           list(page.object_list))
 
         # reversed source (user, search, feed)
         response = c.get(self.url, {'sort': '-source'})
         page = response.context['page']
-        self.assertEquals(list(sorted(page.object_list,
+        self.assertEqual(list(sorted(page.object_list,
                                       reverse=True,
                                       key=lambda x:x.source_type())),
                           list(page.object_list))
@@ -2434,7 +2407,7 @@ class BulkEditAdministrationTestCase(AdministrationBaseTestCase):
         c = Client()
         c.login(username='admin', password='admin')
         response = c.get(self.url, {'category': '3'})
-        self.assertEquals(list(response.context['page'].object_list),
+        self.assertEqual(list(response.context['page'].object_list),
                           list(self.Video_sort_lower(
                     categories=3,
                     status=Video.ACTIVE,
@@ -2448,7 +2421,7 @@ class BulkEditAdministrationTestCase(AdministrationBaseTestCase):
         c = Client()
         c.login(username='admin', password='admin')
         response = c.get(self.url, {'author': '3'})
-        self.assertEquals(list(response.context['page'].object_list),
+        self.assertEqual(list(response.context['page'].object_list),
                           list(self.Video_sort_lower(
                     authors=3,
                     status=Video.ACTIVE,
@@ -2462,7 +2435,7 @@ class BulkEditAdministrationTestCase(AdministrationBaseTestCase):
         c = Client()
         c.login(username='admin', password='admin')
         response = c.get(self.url, {'filter': 'featured'})
-        self.assertEquals(list(response.context['page'].object_list),
+        self.assertEqual(list(response.context['page'].object_list),
                           list(self.Video_sort_lower(
                     status=Video.ACTIVE,
                     ).exclude(last_featured=None)))
@@ -2476,7 +2449,7 @@ class BulkEditAdministrationTestCase(AdministrationBaseTestCase):
         c = Client()
         c.login(username='admin', password='admin')
         response = c.get(self.url, {'filter': 'no-attribution'})
-        self.assertEquals(list(response.context['page'].object_list),
+        self.assertEqual(list(response.context['page'].object_list),
                           list(self.Video_sort_lower(
                     status=Video.ACTIVE,
                     authors=None)))
@@ -2495,7 +2468,7 @@ class BulkEditAdministrationTestCase(AdministrationBaseTestCase):
         c = Client()
         c.login(username='admin', password='admin')
         response = c.get(self.url, {'filter': 'no-category'})
-        self.assertEquals(list(response.context['page'].object_list),
+        self.assertEqual(list(response.context['page'].object_list),
                           list(self.Video_sort_lower(
                     status=Video.ACTIVE,
                     categories=None)))
@@ -2508,7 +2481,7 @@ class BulkEditAdministrationTestCase(AdministrationBaseTestCase):
         c = Client()
         c.login(username='admin', password='admin')
         response = c.get(self.url, {'filter': 'rejected'})
-        self.assertEquals(list(response.context['page'].object_list),
+        self.assertEqual(list(response.context['page'].object_list),
                           list(self.Video_sort_lower(
                     status=Video.REJECTED)))
 
@@ -2520,7 +2493,7 @@ class BulkEditAdministrationTestCase(AdministrationBaseTestCase):
         c = Client()
         c.login(username='admin', password='admin')
         response = c.get(self.url, {'q': 'blend'})
-        self.assertEquals(list(response.context['page'].object_list),
+        self.assertEqual(list(response.context['page'].object_list),
                           list(self.Video_sort_lower(
                     Q(name__icontains="blend") |
                     Q(description__icontains="blend") |
@@ -2548,11 +2521,11 @@ class BulkEditAdministrationTestCase(AdministrationBaseTestCase):
         self.assertStatusCodeEquals(POST_response, 200)
         self.assertTrue(POST_response.context['formset'].is_bound)
         self.assertFalse(POST_response.context['formset'].is_valid())
-        self.assertEquals(len(POST_response.context['formset'].errors[0]), 1)
-        self.assertEquals(len(POST_response.context['formset'].errors[1]), 1)
+        self.assertEqual(len(POST_response.context['formset'].errors[0]), 1)
+        self.assertEqual(len(POST_response.context['formset'].errors[1]), 1)
 
         # make sure the data hasn't changed
-        self.assertEquals(POST_data,
+        self.assertEqual(POST_data,
                           self._POST_data_from_formset(
                 POST_response.context['formset']))
 
@@ -2580,7 +2553,7 @@ class BulkEditAdministrationTestCase(AdministrationBaseTestCase):
         POST_response = c.post(self.url, POST_data,
                                follow=True)
         self.assertStatusCodeEquals(POST_response, 200)
-        self.assertEquals(POST_response.redirect_chain,
+        self.assertEqual(POST_response.redirect_chain,
                           [('http://%s%s?successful' % (
                         'testserver',
                         self.url), 302)])
@@ -2588,19 +2561,19 @@ class BulkEditAdministrationTestCase(AdministrationBaseTestCase):
 
         # make sure the data has been updated
         video1 = Video.objects.get(pk=POST_data['form-0-id'])
-        self.assertEquals(video1.name, POST_data['form-0-name'])
-        self.assertEquals(video1.file_url, POST_data['form-0-file_url'])
-        self.assertEquals(video1.embed_code, POST_data['form-0-embed_code'])
-        self.assertEquals(set(video1.tags.values_list('name', flat=True)),
+        self.assertEqual(video1.name, POST_data['form-0-name'])
+        self.assertEqual(video1.file_url, POST_data['form-0-file_url'])
+        self.assertEqual(video1.embed_code, POST_data['form-0-embed_code'])
+        self.assertEqual(set(video1.tags.values_list('name', flat=True)),
                           set(['tag1', 'tag2']))
 
         video2 = Video.objects.get(
             pk=POST_data['form-1-id'])
-        self.assertEquals(video2.description,
+        self.assertEqual(video2.description,
                           POST_data['form-1-description'])
-        self.assertEquals(video2.embed_code,
+        self.assertEqual(video2.embed_code,
                           POST_data['form-1-embed_code'])
-        self.assertEquals(set(video2.tags.values_list('name', flat=True)),
+        self.assertEqual(set(video2.tags.values_list('name', flat=True)),
                           set(['tag3', 'tag4']))
 
     def test_POST_change_just_one_video(self):
@@ -2623,7 +2596,7 @@ class BulkEditAdministrationTestCase(AdministrationBaseTestCase):
         POST_response = c.post(self.url, POST_data,
                                follow=True)
         self.assertStatusCodeEquals(POST_response, 200)
-        self.assertEquals(POST_response.redirect_chain,
+        self.assertEqual(POST_response.redirect_chain,
                           [('http://%s%s?successful' % (
                         'testserver',
                         self.url), 302)])
@@ -2632,7 +2605,7 @@ class BulkEditAdministrationTestCase(AdministrationBaseTestCase):
         # make sure the data has been updated
         video = Video.objects.get(
             pk=POST_data['form-11-id'])
-        self.assertEquals(video.description,
+        self.assertEqual(video.description,
                           POST_data['form-11-description'])
 
     def test_POST_change_just_one_video_without_authors(self):
@@ -2656,7 +2629,7 @@ class BulkEditAdministrationTestCase(AdministrationBaseTestCase):
         POST_response = c.post(self.url, POST_data,
                                follow=True)
         self.assertStatusCodeEquals(POST_response, 200)
-        self.assertEquals(POST_response.redirect_chain,
+        self.assertEqual(POST_response.redirect_chain,
                           [('http://%s%s?successful' % (
                         'testserver',
                         self.url), 302)])
@@ -2665,7 +2638,7 @@ class BulkEditAdministrationTestCase(AdministrationBaseTestCase):
         # make sure the data remains the same: in the form...
         video = Video.objects.get(
             pk=POST_data['form-11-id'])
-        self.assertEquals([unicode(x.id) for x in video.authors.all()],
+        self.assertEqual([unicode(x.id) for x in video.authors.all()],
                           original_POST_data['form-11-authors'])
 
         # ...in the database
@@ -2695,7 +2668,7 @@ class BulkEditAdministrationTestCase(AdministrationBaseTestCase):
         POST_response = c.post(self.url, POST_data,
                                follow=True)
         self.assertStatusCodeEquals(POST_response, 200)
-        self.assertEquals(POST_response.redirect_chain,
+        self.assertEqual(POST_response.redirect_chain,
                           [('http://%s%s?successful' % (
                         'testserver',
                         self.url), 302)])
@@ -2723,7 +2696,7 @@ class BulkEditAdministrationTestCase(AdministrationBaseTestCase):
         POST_response = c.post(self.url+"?page=2", POST_data,
                                follow=True)
         self.assertStatusCodeEquals(POST_response, 200)
-        self.assertEquals(POST_response.redirect_chain,
+        self.assertEqual(POST_response.redirect_chain,
                           [('http://%s%s?page=2&successful' % (
                         'testserver',
                         self.url), 302)])
@@ -2744,7 +2717,7 @@ class BulkEditAdministrationTestCase(AdministrationBaseTestCase):
         POST_response = c.post(self.url+"?page=2&successful", POST_data,
                                follow=True)
         self.assertStatusCodeEquals(POST_response, 200)
-        self.assertEquals(POST_response.redirect_chain,
+        self.assertEqual(POST_response.redirect_chain,
                           [('http://%s%s?page=2&successful' % (
                         'testserver',
                         self.url), 302)])
@@ -2765,18 +2738,18 @@ class BulkEditAdministrationTestCase(AdministrationBaseTestCase):
 
         POST_response = c.post(self.url, POST_data)
         self.assertStatusCodeEquals(POST_response, 302)
-        self.assertEquals(POST_response['Location'],
+        self.assertEqual(POST_response['Location'],
                           'http://%s%s?successful' % (
                 'testserver',
                 self.url))
 
         # make sure the data has been updated
         video1 = Video.objects.get(pk=POST_data['form-0-id'])
-        self.assertEquals(video1.status, Video.REJECTED)
+        self.assertEqual(video1.status, Video.REJECTED)
 
         video2 = Video.objects.get(
             pk=POST_data['form-1-id'])
-        self.assertEquals(video2.status, Video.REJECTED),
+        self.assertEqual(video2.status, Video.REJECTED),
 
     def test_POST_bulk_edit(self):
         """
@@ -2807,7 +2780,7 @@ class BulkEditAdministrationTestCase(AdministrationBaseTestCase):
 
         POST_response = c.post(self.url, POST_data)
         self.assertStatusCodeEquals(POST_response, 302)
-        self.assertEquals(POST_response['Location'],
+        self.assertEqual(POST_response['Location'],
                           'http://%s%s?successful' % (
                 'testserver',
                 self.url))
@@ -2817,23 +2790,23 @@ class BulkEditAdministrationTestCase(AdministrationBaseTestCase):
         video2 = Video.objects.get(
             pk=POST_data['form-1-id'])
 
-        self.assertEquals(
+        self.assertEqual(
             set(video1.categories.values_list('pk', flat=True)),
             set([1, 2]))
-        self.assertEquals(
+        self.assertEqual(
             set(video2.categories.values_list('pk', flat=True)),
             set([1]))
 
         for video in video1, video2:
-            self.assertEquals(video.name, 'New Name')
-            self.assertEquals(video.description, 'New Description')
-            self.assertEquals(video.when_published,
+            self.assertEqual(video.name, 'New Name')
+            self.assertEqual(video.description, 'New Description')
+            self.assertEqual(video.when_published,
                               datetime.datetime(1985, 3, 24,
                                                 18, 55, 00))
-            self.assertEquals(
+            self.assertEqual(
                 set(video.authors.values_list('pk', flat=True)),
                 set([1, 2]))
-            self.assertEquals(set(video.tags.values_list('name', flat=True)),
+            self.assertEqual(set(video.tags.values_list('name', flat=True)),
                                   set(['tag3', 'tag4']))
 
     def test_POST_bulk_edit_no_authors(self):
@@ -2859,7 +2832,7 @@ class BulkEditAdministrationTestCase(AdministrationBaseTestCase):
 
         POST_response = c.post(self.url, POST_data)
         self.assertStatusCodeEquals(POST_response, 302)
-        self.assertEquals(POST_response['Location'],
+        self.assertEqual(POST_response['Location'],
                           'http://%s%s?successful' % (
                 'testserver',
                 self.url))
@@ -2869,17 +2842,17 @@ class BulkEditAdministrationTestCase(AdministrationBaseTestCase):
         video2 = Video.objects.get(
             pk=POST_data['form-1-id'])
 
-        self.assertEquals(
+        self.assertEqual(
             set(video1.categories.values_list('pk', flat=True)),
             set([1, 2]))
-        self.assertEquals(
+        self.assertEqual(
             set(video2.categories.values_list('pk', flat=True)),
             set([1]))
 
         for video in video1, video2:
-            self.assertEquals(
+            self.assertEqual(
                 set(video.authors.values_list('pk', flat=True)), set())
-            self.assertEquals(set(video.tags.values_list('name', flat=True)),
+            self.assertEqual(set(video.tags.values_list('name', flat=True)),
                                   set(['tag3', 'tag4']))
 
     def test_POST_bulk_delete(self):
@@ -2900,18 +2873,18 @@ class BulkEditAdministrationTestCase(AdministrationBaseTestCase):
 
         POST_response = c.post(self.url, POST_data)
         self.assertStatusCodeEquals(POST_response, 302)
-        self.assertEquals(POST_response['Location'],
+        self.assertEqual(POST_response['Location'],
                           'http://%s%s?successful' % (
                 'testserver',
                 self.url))
 
         # make sure the data has been updated
         video1 = Video.objects.get(pk=POST_data['form-0-id'])
-        self.assertEquals(video1.status, Video.REJECTED)
+        self.assertEqual(video1.status, Video.REJECTED)
 
         video2 = Video.objects.get(
             pk=POST_data['form-1-id'])
-        self.assertEquals(video2.status, Video.REJECTED)
+        self.assertEqual(video2.status, Video.REJECTED)
 
     def test_POST_bulk_unapprove(self):
         """
@@ -2931,18 +2904,18 @@ class BulkEditAdministrationTestCase(AdministrationBaseTestCase):
 
         POST_response = c.post(self.url, POST_data)
         self.assertStatusCodeEquals(POST_response, 302)
-        self.assertEquals(POST_response['Location'],
+        self.assertEqual(POST_response['Location'],
                           'http://%s%s?successful' % (
                 'testserver',
                 self.url))
 
         # make sure the data has been updated
         video1 = Video.objects.get(pk=POST_data['form-0-id'])
-        self.assertEquals(video1.status, Video.UNAPPROVED)
+        self.assertEqual(video1.status, Video.UNAPPROVED)
 
         video2 = Video.objects.get(
             pk=POST_data['form-1-id'])
-        self.assertEquals(video2.status, Video.UNAPPROVED)
+        self.assertEqual(video2.status, Video.UNAPPROVED)
 
     def test_POST_bulk_feature(self):
         """
@@ -2962,7 +2935,7 @@ class BulkEditAdministrationTestCase(AdministrationBaseTestCase):
 
         POST_response = c.post(self.url, POST_data)
         self.assertStatusCodeEquals(POST_response, 302)
-        self.assertEquals(POST_response['Location'],
+        self.assertEqual(POST_response['Location'],
                           'http://%s%s?successful' % (
                 'testserver',
                 self.url))
@@ -2997,7 +2970,7 @@ class BulkEditAdministrationTestCase(AdministrationBaseTestCase):
 
         POST_response = c.post(self.url, POST_data)
         self.assertStatusCodeEquals(POST_response, 302)
-        self.assertEquals(POST_response['Location'],
+        self.assertEqual(POST_response['Location'],
                           'http://%s%s?successful' % (
                 'testserver',
                 self.url))
@@ -3042,7 +3015,7 @@ class EditSettingsDeniedSometimesTestCase(AdministrationBaseTestCase):
         POST_response = c.post(self.url, self.POST_data)
 
         self.assertStatusCodeEquals(POST_response, 200)
-        self.assertEquals(POST_response.template[0].name,
+        self.assertEqual(POST_response.template[0].name,
                           'localtv/admin/edit_settings.html')
         self.assertFalse(POST_response.context['form'].is_valid())
 
@@ -3071,9 +3044,8 @@ class EditUsersDeniedSometimesTestCase(AdministrationBaseTestCase):
         """
         self.site_location.tier_name = 'basic'
         self.site_location.save()
-
         c = Client()
-        c.login(username="admin", password="admin")
+        c.login(username="superuser", password="superuser")
         POST_data = {
             'submit': 'Add',
             'username': 'new',
@@ -3127,7 +3099,7 @@ class EditSettingsAdministrationTestCase(AdministrationBaseTestCase):
         c.login(username='admin', password='admin')
         response = c.get(self.url)
         self.assertStatusCodeEquals(response, 200)
-        self.assertEquals(response.template[0].name,
+        self.assertEqual(response.template[0].name,
                           'localtv/admin/edit_settings.html')
         self.assertTrue('form' in response.context[0])
 
@@ -3142,7 +3114,7 @@ class EditSettingsAdministrationTestCase(AdministrationBaseTestCase):
         POST_response = c.post(self.url, )
 
         self.assertStatusCodeEquals(POST_response, 200)
-        self.assertEquals(POST_response.template[0].name,
+        self.assertEqual(POST_response.template[0].name,
                           'localtv/admin/edit_settings.html')
         self.assertFalse(POST_response.context['form'].is_valid())
 
@@ -3158,7 +3130,7 @@ class EditSettingsAdministrationTestCase(AdministrationBaseTestCase):
         POST_response = c.post(self.url, self.POST_data)
 
         self.assertStatusCodeEquals(POST_response, 200)
-        self.assertEquals(POST_response.template[0].name,
+        self.assertEqual(POST_response.template[0].name,
                           'localtv/admin/edit_settings.html')
         self.assertFalse(POST_response.context['form'].is_valid())
 
@@ -3187,19 +3159,19 @@ class EditSettingsAdministrationTestCase(AdministrationBaseTestCase):
         POST_response = c.post(self.url, self.POST_data)
 
         self.assertStatusCodeEquals(POST_response, 302)
-        self.assertEquals(POST_response['Location'],
+        self.assertEqual(POST_response['Location'],
                           'http://%s%s' % (
                 'testserver',
                 self.url))
 
         site_location = SiteLocation.objects.get(
             pk=self.site_location.pk)
-        self.assertEquals(site_location.site.name, 'New Title')
-        self.assertEquals(site_location.tagline, 'New Tagline')
-        self.assertEquals(site_location.about_html, 'New About')
-        self.assertEquals(site_location.sidebar_html, 'New Sidebar')
-        self.assertEquals(site_location.footer_html, 'New Footer')
-        self.assertEquals(site_location.css, 'New Css')
+        self.assertEqual(site_location.site.name, 'New Title')
+        self.assertEqual(site_location.tagline, 'New Tagline')
+        self.assertEqual(site_location.about_html, 'New About')
+        self.assertEqual(site_location.sidebar_html, 'New Sidebar')
+        self.assertEqual(site_location.footer_html, 'New Footer')
+        self.assertEqual(site_location.css, 'New Css')
         self.assertTrue(site_location.display_submit_button)
         self.assertTrue(site_location.submission_requires_login)
         self.assertFalse(site_location.use_original_date)
@@ -3208,9 +3180,9 @@ class EditSettingsAdministrationTestCase(AdministrationBaseTestCase):
 
         logo_data = file(self._data_file('logo.png')).read()
         site_location.logo.open()
-        self.assertEquals(site_location.logo.read(), logo_data)
+        self.assertEqual(site_location.logo.read(), logo_data)
         site_location.background.open()
-        self.assertEquals(site_location.background.read(), logo_data)
+        self.assertEqual(site_location.background.read(), logo_data)
 
     def test_POST_logo_background_long_name(self):
         """
@@ -3227,7 +3199,7 @@ class EditSettingsAdministrationTestCase(AdministrationBaseTestCase):
         POST_response = c.post(self.url, self.POST_data)
 
         self.assertStatusCodeEquals(POST_response, 302)
-        self.assertEquals(POST_response['Location'],
+        self.assertEqual(POST_response['Location'],
                           'http://%s%s' % (
                 'testserver',
                 self.url))
@@ -3236,9 +3208,9 @@ class EditSettingsAdministrationTestCase(AdministrationBaseTestCase):
             pk=self.site_location.pk)
         logo_data = file(self._data_file('logo.png')).read()
         site_location.logo.open()
-        self.assertEquals(site_location.logo.read(), logo_data)
+        self.assertEqual(site_location.logo.read(), logo_data)
         site_location.background.open()
-        self.assertEquals(site_location.background.read(), logo_data)
+        self.assertEqual(site_location.background.read(), logo_data)
 
         logo_name = site_location.logo.name
         background_name = site_location.background.name
@@ -3248,15 +3220,15 @@ class EditSettingsAdministrationTestCase(AdministrationBaseTestCase):
 
         POST_response = c.post(self.url, self.POST_data)
         self.assertStatusCodeEquals(POST_response, 302)
-        self.assertEquals(POST_response['Location'],
+        self.assertEqual(POST_response['Location'],
                           'http://%s%s' % (
                 'testserver',
                 self.url))
 
         site_location = SiteLocation.objects.get(
             pk=self.site_location.pk)
-        self.assertEquals(site_location.logo.name, logo_name)
-        self.assertEquals(site_location.background.name,
+        self.assertEqual(site_location.logo.name, logo_name)
+        self.assertEqual(site_location.background.name,
                           background_name)
 
     def test_POST_delete_background(self):
@@ -3274,14 +3246,14 @@ class EditSettingsAdministrationTestCase(AdministrationBaseTestCase):
         POST_response = c.post(self.url, self.POST_data)
 
         self.assertStatusCodeEquals(POST_response, 302)
-        self.assertEquals(POST_response['Location'],
+        self.assertEqual(POST_response['Location'],
                           'http://%s%s' % (
                 'testserver',
                 self.url))
 
         site_location = SiteLocation.objects.get(
             pk=self.site_location.pk)
-        self.assertEquals(site_location.background, '')
+        self.assertEqual(site_location.background, '')
 
     def test_POST_delete_background_missing(self):
         """
@@ -3295,14 +3267,14 @@ class EditSettingsAdministrationTestCase(AdministrationBaseTestCase):
         POST_response = c.post(self.url, self.POST_data)
 
         self.assertStatusCodeEquals(POST_response, 302)
-        self.assertEquals(POST_response['Location'],
+        self.assertEqual(POST_response['Location'],
                           'http://%s%s' % (
                 'testserver',
                 self.url))
 
         site_location = SiteLocation.objects.get(
             pk=self.site_location.pk)
-        self.assertEquals(site_location.background, '')
+        self.assertEqual(site_location.background, '')
 
 
 # -----------------------------------------------------------------------------
@@ -3327,7 +3299,7 @@ class FlatPageAdministrationTestCase(AdministrationBaseTestCase):
         c.login(username='admin', password='admin')
         response = c.get(self.url)
         self.assertStatusCodeEquals(response, 200)
-        self.assertEquals(response.template[0].name,
+        self.assertEqual(response.template[0].name,
                           'localtv/admin/flatpages.html')
         self.assertTrue('formset' in response.context[0])
         self.assertTrue('form' in response.context[0])
@@ -3342,7 +3314,7 @@ class FlatPageAdministrationTestCase(AdministrationBaseTestCase):
         response = c.post(self.url,
                           {'submit': 'Add'})
         self.assertStatusCodeEquals(response, 200)
-        self.assertEquals(response.template[0].name,
+        self.assertEqual(response.template[0].name,
                           'localtv/admin/flatpages.html')
         self.assertTrue('formset' in response.context[0])
         self.assertTrue(
@@ -3358,7 +3330,7 @@ class FlatPageAdministrationTestCase(AdministrationBaseTestCase):
         c.login(username='admin', password='admin')
         response = c.get(self.url)
         self.assertStatusCodeEquals(response, 200)
-        self.assertEquals(response.template[0].name,
+        self.assertEqual(response.template[0].name,
                           'localtv/admin/flatpages.html')
         self.assertTrue(
             getattr(response.context[0]['formset'], 'errors') is not None)
@@ -3380,20 +3352,20 @@ class FlatPageAdministrationTestCase(AdministrationBaseTestCase):
             }
         response = c.post(self.url, POST_data)
         self.assertStatusCodeEquals(response, 302)
-        self.assertEquals(response['Location'],
+        self.assertEqual(response['Location'],
                           'http://%s%s?successful' % (
                 'testserver',
                 self.url))
 
         new = FlatPage.objects.order_by('-id')[0]
 
-        self.assertEquals(list(new.sites.all()), [self.site_location.site])
+        self.assertEqual(list(new.sites.all()), [self.site_location.site])
 
         for key, value in POST_data.items():
             if key == 'submit':
                 pass
             else:
-                self.assertEquals(getattr(new, key), value)
+                self.assertEqual(getattr(new, key), value)
 
     def test_POST_add_existing_flatpage(self):
         """
@@ -3410,7 +3382,7 @@ class FlatPageAdministrationTestCase(AdministrationBaseTestCase):
             }
         response = c.post(self.url, POST_data)
         self.assertStatusCodeEquals(response, 200)
-        self.assertEquals(response.template[0].name,
+        self.assertEqual(response.template[0].name,
                           'localtv/admin/flatpages.html')
         self.assertTrue('formset' in response.context[0])
         self.assertTrue(
@@ -3432,7 +3404,7 @@ class FlatPageAdministrationTestCase(AdministrationBaseTestCase):
             }
         response = c.post(self.url, POST_data)
         self.assertStatusCodeEquals(response, 200)
-        self.assertEquals(response.template[0].name,
+        self.assertEqual(response.template[0].name,
                           'localtv/admin/flatpages.html')
         self.assertTrue('formset' in response.context[0])
         self.assertTrue(
@@ -3458,13 +3430,13 @@ class FlatPageAdministrationTestCase(AdministrationBaseTestCase):
                 submit='Save'))
 
         self.assertStatusCodeEquals(POST_response, 302)
-        self.assertEquals(POST_response['Location'],
+        self.assertEqual(POST_response['Location'],
                           'http://%s%s?successful' % (
                 'testserver',
                 self.url))
 
         for old, new in zip(old_flatpages, FlatPage.objects.values()):
-            self.assertEquals(old, new)
+            self.assertEqual(old, new)
 
     def test_POST_save_changes(self):
         """
@@ -3486,19 +3458,19 @@ class FlatPageAdministrationTestCase(AdministrationBaseTestCase):
 
         POST_response = c.post(self.url, POST_data)
         self.assertStatusCodeEquals(POST_response, 302)
-        self.assertEquals(POST_response['Location'],
+        self.assertEqual(POST_response['Location'],
                           'http://%s%s?successful' % (
                 'testserver',
                 self.url))
 
-        self.assertEquals(FlatPage.objects.count(), 5) # no one got added
+        self.assertEqual(FlatPage.objects.count(), 5) # no one got added
 
         new_url = FlatPage.objects.get(url='/newflatpage/')
-        self.assertEquals(new_url.pk, 1)
-        self.assertEquals(new_url.title, 'New Title')
+        self.assertEqual(new_url.pk, 1)
+        self.assertEqual(new_url.title, 'New Title')
 
         new_content = FlatPage.objects.get(url='/flatpage1/')
-        self.assertEquals(new_content.content, 'New Content')
+        self.assertEqual(new_content.content, 'New Content')
 
     def test_POST_delete(self):
         """
@@ -3520,13 +3492,13 @@ class FlatPageAdministrationTestCase(AdministrationBaseTestCase):
 
         POST_response = c.post(self.url, POST_data)
         self.assertStatusCodeEquals(POST_response, 302)
-        self.assertEquals(POST_response['Location'],
+        self.assertEqual(POST_response['Location'],
                           'http://%s%s?successful' % (
                 'testserver',
                 self.url))
 
         # three flatpages got removed
-        self.assertEquals(FlatPage.objects.count(), 2)
+        self.assertEqual(FlatPage.objects.count(), 2)
 
     def test_POST_bulk_delete(self):
         """
@@ -3548,14 +3520,14 @@ class FlatPageAdministrationTestCase(AdministrationBaseTestCase):
 
         POST_response = c.post(self.url, POST_data)
         self.assertStatusCodeEquals(POST_response, 302)
-        self.assertEquals(POST_response['Location'],
+        self.assertEqual(POST_response['Location'],
                           'http://%s%s?successful' % (
                 'testserver',
                 self.url))
 
 
         # three flatpages got removed
-        self.assertEquals(FlatPage.objects.count(), 2)
+        self.assertEqual(FlatPage.objects.count(), 2)
 
 def videos_limit_of_two(*args, **kwargs):
     return 2
@@ -3716,7 +3688,7 @@ class DowngradingDisablesThings(BaseTestCase):
 
         # Now check what messages we would generate if we dropped down
         # to basic.
-        self.assert_(
+        self.assertTrue(
             'admins' not in localtv.tiers.user_warnings_for_downgrade(new_tier_name='basic'))
 
         # Try pushing the number of admins down to 1, which should change nothing.
@@ -3944,7 +3916,7 @@ class NightlyTiersEmails(BaseTestCase):
 
     def setUp(self):
         super(NightlyTiersEmails, self).setUp()
-        self.assertEquals(len(mail.outbox), 0)
+        self.assertEqual(len(mail.outbox), 0)
         self.admin = localtv.tiers.get_main_site_admin()
         self.admin.last_login = datetime.datetime.utcnow()
         self.admin.save()
@@ -3962,7 +3934,7 @@ class NightlyTiersEmails(BaseTestCase):
 
         # Make sure it sends an email...
         self.tiers_cmd.handle()
-        self.assertEquals(len(mail.outbox), 1)
+        self.assertEqual(len(mail.outbox), 1)
         mail.outbox = []
 
         # And make sure the SiteLocation knows that the email was sent...
@@ -3970,18 +3942,18 @@ class NightlyTiersEmails(BaseTestCase):
 
         # ..so that the next time, it doesn't send any email.
         self.tiers_cmd.handle()
-        self.assertEquals(len(mail.outbox), 0)
+        self.assertEqual(len(mail.outbox), 0)
 
     @mock.patch('localtv.tiers.Tier.remaining_videos_as_proportion', mock.Mock(return_value=0.2))
     def test_video_allotment(self):
         # First, it sends an email. But it saves a note in the SiteLocation...
         self.tiers_cmd.handle()
-        self.assertEquals(len(mail.outbox), 1)
+        self.assertEqual(len(mail.outbox), 1)
         mail.outbox = []
 
         # ..so that the next time, it doesn't send any email.
         self.tiers_cmd.handle()
-        self.assertEquals(len(mail.outbox), 0)
+        self.assertEqual(len(mail.outbox), 0)
 
     @mock.patch('localtv.models.TierInfo.time_until_free_trial_expires', mock.Mock(return_value=datetime.timedelta(days=7)))
     def test_free_trial_nearly_up_notification_false(self):
@@ -4174,9 +4146,9 @@ class TestTiersComplianceEmail(BaseTestCase):
         self.assertEqual(0,
                          len(mail.outbox))
 
-    def test_no_email_when_within_limits(self):
+    def test_email_when_within_limits(self):
         self.cmd.handle()
-        self.assertEqual(0,
+        self.assertEqual(1,
                          len(mail.outbox))
 
     def test_no_email_when_over_video_limits_but_database_says_it_has_been_sent(self):
@@ -4266,7 +4238,7 @@ class IpnIntegration(BaseTestCase):
                                {'target_tier_name': 'plus'})
 
         # Make sure we switched
-        self.assertEquals('plus', self.site_location.tier_name)
+        self.assertEqual('plus', self.site_location.tier_name)
 
         # Discover that we still have no paypal profile, because PayPal took a few sec to submit the IPN...
         new_tier_info = TierInfo.objects.get_current()
@@ -4279,7 +4251,7 @@ class IpnIntegration(BaseTestCase):
         self.assertFalse('until midnight on None' in message)
 
         # Now, PayPal sends us the IPN.
-        ipn_data = {u'last_name': u'User', u'receiver_email': settings.PAYPAL_RECEIVER_EMAIL, u'residence_country': u'US', u'mc_amount1': u'0.00', u'invoice': u'premium', u'payer_status': u'verified', u'txn_type': u'subscr_signup', u'first_name': u'Test', u'item_name': u'Miro Community subscription (plus)', u'charset': u'windows-1252', u'custom': u'plus for example.com', u'notify_version': u'3.0', u'recurring': u'1', u'test_ipn': u'1', u'business': settings.PAYPAL_RECEIVER_EMAIL, u'payer_id': u'SQRR5KCD7Z266', u'period3': u'1 M', u'period1': u'30 D', u'verify_sign': u'AKcOzwh6cb1eCtGrfvM.18Ri5hWDAWoRIoMoZm39KHDsLIoVZyWJDM7B', u'subscr_id': u'I-MEBGA2YXPNJK', u'amount3': u'15.00', u'amount1': u'0.00', u'mc_amount3': u'15.00', u'mc_currency': u'USD', u'subscr_date': u'12:06:48 Feb 17, 2011 PST', u'payer_email': u'paypal_1297894110_per@s.asheesh.org', u'reattempt': u'1'}
+        ipn_data = {u'last_name': u'User', u'receiver_email': settings.PAYPAL_RECEIVER_EMAIL, u'residence_country': u'US', u'mc_amount1': u'0.00', u'invoice': u'premium', u'payer_status': u'verified', u'txn_type': u'subscr_signup', u'first_name': u'Test', u'item_name': u'Miro Community subscription (plus)', u'charset': u'windows-1252', u'custom': u'plus for example.com', u'notify_version': u'3.0', u'recurring': u'1', u'test_ipn': u'1', u'business': settings.PAYPAL_RECEIVER_EMAIL, u'payer_id': u'SQRR5KCD7Z266', u'period3': u'1 M', u'period1': u'30 D', u'verify_sign': u'AKcOzwh6cb1eCtGrfvM.18Ri5hWDAWoRIoMoZm39KHDsLIoVZyWJDM7B', u'subscr_id': u'I-MEBGA2YXPNJK', u'amount3': unicode(PLUS_COST), u'amount1': u'0.00', u'mc_amount3': unicode(PLUS_COST), u'mc_currency': u'USD', u'subscr_date': u'12:06:48 Feb 17, 2011 PST', u'payer_email': u'paypal_1297894110_per@s.asheesh.org', u'reattempt': u'1'}
         url = reverse('localtv_admin_ipn_endpoint',
                       kwargs={'payment_secret': self.tier_info.get_payment_secret()})
 
@@ -4316,7 +4288,7 @@ class IpnIntegration(BaseTestCase):
         if override_amount3:
             amount3 = override_amount3
         else:
-            amount3 = u'15.00'
+            amount3 = unicode(PLUS_COST)
 
         # Now, PayPal sends us the IPN.
         ipn_data = {u'last_name': u'User', u'receiver_email': settings.PAYPAL_RECEIVER_EMAIL, u'residence_country': u'US', u'mc_amount1': u'0.00', u'invoice': u'premium', u'payer_status': u'verified', u'txn_type': u'subscr_signup', u'first_name': u'Test', u'item_name': u'Miro Community subscription (plus)', u'charset': u'windows-1252', u'custom': u'plus for example.com', u'notify_version': u'3.0', u'recurring': u'1', u'test_ipn': u'1', u'business': settings.PAYPAL_RECEIVER_EMAIL, u'payer_id': u'SQRR5KCD7Z266', u'period3': u'1 M', u'period1': u'30 D', u'verify_sign': u'AKcOzwh6cb1eCtGrfvM.18Ri5hWDAWoRIoMoZm39KHDsLIoVZyWJDM7B', u'subscr_id': u'I-MEBGA2YXPNJK', u'amount3': amount3, u'amount1': u'0.00', u'mc_amount3': amount3, u'mc_currency': u'USD', u'subscr_date': u'12:06:48 Feb 17, 2011 PST', u'payer_email': u'paypal_1297894110_per@s.asheesh.org', u'reattempt': u'1'}
@@ -4342,7 +4314,7 @@ class IpnIntegration(BaseTestCase):
         if override_amount3:
             amount3 = override_amount3
         else:
-            amount3 = u'15.00'
+            amount3 = unicode(PLUS_COST)
 
         if override_subscr_id:
             subscr_id = override_subscr_id
@@ -4386,7 +4358,7 @@ class IpnIntegration(BaseTestCase):
         # Now, we get an IPN for $35, which should move us to 'premium'
         # Now, PayPal sends us the IPN.
         mail.outbox = []
-        ipn_data = {u'last_name': u'User', u'receiver_email': settings.PAYPAL_RECEIVER_EMAIL, u'residence_country': u'US', u'mc_amount1': u'0.00', u'invoice': u'premium', u'payer_status': u'verified', u'txn_type': u'subscr_signup', u'first_name': u'Test', u'item_name': u'Miro Community subscription (plus)', u'charset': u'windows-1252', u'custom': u'plus for example.com', u'notify_version': u'3.0', u'recurring': u'1', u'test_ipn': u'1', u'business': settings.PAYPAL_RECEIVER_EMAIL, u'payer_id': u'SQRR5KCD7Z266', u'period3': u'1 M', u'period1': u'', u'verify_sign': u'AKcOzwh6cb1eCtGrfvM.18Ri5hWDAWoRIoMoZm39KHDsLIoVZyWJDM7B', u'subscr_id': u'I-MEBGA2YXPNJR', u'amount3': u'35.00', u'amount1': u'0.00', u'mc_amount3': u'35.00', u'mc_currency': u'USD', u'subscr_date': u'12:06:48 Feb 17, 2011 PST', u'payer_email': u'paypal_1297894110_per@s.asheesh.org', u'reattempt': u'1'}
+        ipn_data = {u'last_name': u'User', u'receiver_email': settings.PAYPAL_RECEIVER_EMAIL, u'residence_country': u'US', u'mc_amount1': u'0.00', u'invoice': u'premium', u'payer_status': u'verified', u'txn_type': u'subscr_signup', u'first_name': u'Test', u'item_name': u'Miro Community subscription (plus)', u'charset': u'windows-1252', u'custom': u'plus for example.com', u'notify_version': u'3.0', u'recurring': u'1', u'test_ipn': u'1', u'business': settings.PAYPAL_RECEIVER_EMAIL, u'payer_id': u'SQRR5KCD7Z266', u'period3': u'1 M', u'period1': u'', u'verify_sign': u'AKcOzwh6cb1eCtGrfvM.18Ri5hWDAWoRIoMoZm39KHDsLIoVZyWJDM7B', u'subscr_id': u'I-MEBGA2YXPNJR', u'amount3': unicode(PREMIUM_COST), u'amount1': u'0.00', u'mc_amount3': unicode(PREMIUM_COST), u'mc_currency': u'USD', u'subscr_date': u'12:06:48 Feb 17, 2011 PST', u'payer_email': u'paypal_1297894110_per@s.asheesh.org', u'reattempt': u'1'}
         url = reverse('localtv_admin_ipn_endpoint',
                       kwargs={'payment_secret': self.tier_info.get_payment_secret()})
 
@@ -4399,7 +4371,7 @@ class IpnIntegration(BaseTestCase):
 
         ti = TierInfo.objects.get_current()
         self.assertEqual(ti.current_paypal_profile_id, 'I-MEBGA2YXPNJR') # the new one
-        self.assert_(ti.payment_due_date > datetime.datetime(2011, 3, 19, 0, 0, 0))
+        self.assertTrue(ti.payment_due_date > datetime.datetime(2011, 3, 19, 0, 0, 0))
         import localtv.zendesk
         self.assertEqual(len([msg for msg in localtv.zendesk.outbox
                               if 'cancel a recurring payment profile' in msg['subject']]), 1)
@@ -4408,7 +4380,7 @@ class IpnIntegration(BaseTestCase):
 
         # PayPal eventually sends us the IPN cancelling the old subscription, because someone
         # in the MC team ends it.
-        ipn_data = {u'last_name': u'User', u'receiver_email': settings.PAYPAL_RECEIVER_EMAIL, u'residence_country': u'US', u'mc_amount1': u'0.00', u'invoice': u'premium', u'payer_status': u'verified', u'txn_type': u'subscr_cancel', u'first_name': u'Test', u'item_name': u'Miro Community subscription (plus)', u'charset': u'windows-1252', u'custom': u'plus for example.com', u'notify_version': u'3.0', u'recurring': u'1', u'test_ipn': u'1', u'business': settings.PAYPAL_RECEIVER_EMAIL, u'payer_id': u'SQRR5KCD7Z266', u'period3': u'1 M', u'period1': u'30 D', u'verify_sign': u'AKcOzwh6cb1eCtGrfvM.18Ri5hWDAWoRIoMoZm39KHDsLIoVZyWJDM7B', u'subscr_id': u'I-MEBGA2YXPNJK', u'amount3': u'15.00', u'amount1': u'0.00', u'mc_amount3': u'15.00', u'mc_currency': u'USD', u'subscr_date': u'12:06:48 Feb 17, 2011 PST', u'payer_email': u'paypal_1297894110_per@s.asheesh.org', u'reattempt': u'1'}
+        ipn_data = {u'last_name': u'User', u'receiver_email': settings.PAYPAL_RECEIVER_EMAIL, u'residence_country': u'US', u'mc_amount1': u'0.00', u'invoice': u'premium', u'payer_status': u'verified', u'txn_type': u'subscr_cancel', u'first_name': u'Test', u'item_name': u'Miro Community subscription (plus)', u'charset': u'windows-1252', u'custom': u'plus for example.com', u'notify_version': u'3.0', u'recurring': u'1', u'test_ipn': u'1', u'business': settings.PAYPAL_RECEIVER_EMAIL, u'payer_id': u'SQRR5KCD7Z266', u'period3': u'1 M', u'period1': u'30 D', u'verify_sign': u'AKcOzwh6cb1eCtGrfvM.18Ri5hWDAWoRIoMoZm39KHDsLIoVZyWJDM7B', u'subscr_id': u'I-MEBGA2YXPNJK', u'amount3': unicode(PLUS_COST), u'amount1': u'0.00', u'mc_amount3': unicode(PLUS_COST), u'mc_currency': u'USD', u'subscr_date': u'12:06:48 Feb 17, 2011 PST', u'payer_email': u'paypal_1297894110_per@s.asheesh.org', u'reattempt': u'1'}
         url = reverse('localtv_admin_ipn_endpoint',
                       kwargs={'payment_secret': self.tier_info.get_payment_secret()})
 
@@ -4432,7 +4404,7 @@ class IpnIntegration(BaseTestCase):
         self.assertEqual(tier_info.current_paypal_profile_id, 'I-MEBGA2YXPNJK')
 
         # Send ourselves a payment IPN.
-        ipn_data = {u'last_name': u'User', u'receiver_email': settings.PAYPAL_RECEIVER_EMAIL, u'residence_country': u'US', u'mc_amount1': u'0.00', u'invoice': u'premium', u'payer_status': u'verified', u'txn_type': u'subscr_payment', u'txn_id':u'S-4LF64589B35985347', u'payment_status': 'Completed', u'first_name': u'Test', u'item_name': u'Miro Community subscription (plus)', u'charset': u'windows-1252', u'custom': u'plus for example.com', u'notify_version': u'3.0', u'recurring': u'1', u'test_ipn': u'1', u'business': settings.PAYPAL_RECEIVER_EMAIL, u'payer_id': u'SQRR5KCD7Z266', u'verify_sign': u'AKcOzwh6cb1eCtGrfvM.18Ri5hWDAWoRIoMoZm39KHDsLIoVZyWJDM7B', u'subscr_id': u'I-MEBGA2YXPNJK', u'payment_gross': u'15.00', u'payment_date': u'12:06:48 Mar 17, 2011 PST', u'payer_email': u'paypal_1297894110_per@s.asheesh.org', u'reattempt': u'1'}
+        ipn_data = {u'last_name': u'User', u'receiver_email': settings.PAYPAL_RECEIVER_EMAIL, u'residence_country': u'US', u'mc_amount1': u'0.00', u'invoice': u'premium', u'payer_status': u'verified', u'txn_type': u'subscr_payment', u'txn_id':u'S-4LF64589B35985347', u'payment_status': 'Completed', u'first_name': u'Test', u'item_name': u'Miro Community subscription (plus)', u'charset': u'windows-1252', u'custom': u'plus for example.com', u'notify_version': u'3.0', u'recurring': u'1', u'test_ipn': u'1', u'business': settings.PAYPAL_RECEIVER_EMAIL, u'payer_id': u'SQRR5KCD7Z266', u'verify_sign': u'AKcOzwh6cb1eCtGrfvM.18Ri5hWDAWoRIoMoZm39KHDsLIoVZyWJDM7B', u'subscr_id': u'I-MEBGA2YXPNJK', u'payment_gross': unicode(PLUS_COST), u'payment_date': u'12:06:48 Mar 17, 2011 PST', u'payer_email': u'paypal_1297894110_per@s.asheesh.org', u'reattempt': u'1'}
         url = reverse('localtv_admin_ipn_endpoint',
                       kwargs={'payment_secret': self.tier_info.get_payment_secret()})
 
@@ -4457,7 +4429,8 @@ class IpnIntegration(BaseTestCase):
     @mock.patch('paypal.standard.ipn.models.PayPalIPN._postback', mock.Mock(return_value='VERIFIED'))
     def test_downgrade_during_free_trial(self):
         # First, upgrade to 'premium' during the free trial.
-        self.upgrade_and_submit_ipn_skipping_free_trial_post('35.00')
+        self.upgrade_and_submit_ipn_skipping_free_trial_post(
+            unicode(PREMIUM_COST))
 
         # Make sure it worked
         tierinfo = TierInfo.objects.get_current()
@@ -4466,7 +4439,7 @@ class IpnIntegration(BaseTestCase):
 
         # Now, submit an IPN event for changing the payment amount to '15.00'
         # This should move us down to 'plus'
-        self.submit_ipn_subscription_modify('15.00')
+        self.submit_ipn_subscription_modify(unicode(PLUS_COST))
 
         # Make sure it worked
         self.assertEqual('plus', SiteLocation.objects.get_current().tier_name)
@@ -4479,7 +4452,9 @@ class TestMidMonthPaymentAmounts(BaseTestCase):
             start_tier_name='plus', target_tier_name='premium',
             current_payment_due_date=datetime.datetime(2011, 1, 30, 0, 0, 0),
             todays_date=datetime.datetime(2011, 1, 1, 12, 0, 0))
-        expected = {'recurring': 35, 'cost_for_prorated_period': 18, 'days_covered_by_prorating': 28}
+        expected = {'recurring': PREMIUM_COST,
+                    'cost_for_prorated_period': int(PREMIUM_COST * 0.44),
+                    'days_covered_by_prorating': 28}
         self.assertEqual(data, expected)
 
     def test_end_of_month(self):
@@ -4487,7 +4462,7 @@ class TestMidMonthPaymentAmounts(BaseTestCase):
             start_tier_name='plus', target_tier_name='premium',
             current_payment_due_date=datetime.datetime(2011, 2, 1, 0, 0, 0),
             todays_date=datetime.datetime(2011, 1, 31, 12, 0, 0))
-        expected = {'recurring': 35, 'cost_for_prorated_period': 0, 'days_covered_by_prorating': 0}
+        expected = {'recurring': PREMIUM_COST, 'cost_for_prorated_period': 0, 'days_covered_by_prorating': 0}
         self.assertEqual(data, expected)
 
 class TestUpgradePage(BaseTestCase):
@@ -4764,7 +4739,7 @@ class TestUpgradePage(BaseTestCase):
             self._run_method_from_ipn_integration_test_case(
                 'upgrade_including_prorated_duration_and_amount', 
                 '%d.00' % premium['cost_for_prorated_period'],
-                '35.00',
+                str(PREMIUM_COST),
                 '%d D' % premium['days_covered_by_prorating'])
             sl = SiteLocation.objects.get_current()
             self.assertEqual('premium', sl.tier_name)
@@ -4777,7 +4752,7 @@ class TestUpgradePage(BaseTestCase):
     def test_downgrade_to_paid_during_a_trial(self):
         # The test gets initialized in 'basic' with a free trial available.
         # First, switch into a free trial of 'max'.
-        self._run_method_from_ipn_integration_test_case('upgrade_and_submit_ipn_skipping_free_trial_post', '75.00')
+        self._run_method_from_ipn_integration_test_case('upgrade_and_submit_ipn_skipping_free_trial_post', str(MAX_COST))
         mail.outbox = [] # remove "Congratulations" email
 
         # Sanity-check the free trial state.
@@ -4843,7 +4818,7 @@ class TestUpgradePage(BaseTestCase):
         self.assertTrue(response.context['can_modify'])
         self.assertTrue('"modify" value="1"' in response.content)
 
-        self._run_method_from_ipn_integration_test_case('submit_ipn_subscription_modify', '15.00', old_profile)
+        self._run_method_from_ipn_integration_test_case('submit_ipn_subscription_modify', str(PLUS_COST), old_profile)
 
         ti = TierInfo.objects.get_current()
         self.assertEqual(old_profile, ti.current_paypal_profile_id)
