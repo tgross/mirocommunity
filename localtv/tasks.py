@@ -23,9 +23,12 @@ import random
 from celery.exceptions import MaxRetriesExceededError
 from celery.task import task
 from django.conf import settings, Settings
+from django import db
 from django.db.models.loading import get_model
+from django.db.utils import (ConnectionHandler, ConnectionRouter, load_backend,
+                             DEFAULT_DB_ALIAS)
 from django.contrib.auth.models import User
-from haystack import site
+import haystack
 from haystack.query import SearchQuerySet
 
 # Some haystack backends raise lock errors if concurrent processes try to update
@@ -62,11 +65,13 @@ def patch_settings(func):
     def wrapper(*args, **kwargs):
         new_settings_module = kwargs.pop('settings')
         old_settings_module = settings.SETTINGS_MODULE
+        old_settings = settings._wrapped
+
         # This is a HACK since we currently rely on this environment variable to
         # generate a site's settings file. Should be safe to modify since it's
         # really only used to set up the settings.
         os.environ['DJANGO_SETTINGS_MODULE'] = new_settings_module
-        old_settings = settings._wrapped
+
         if new_settings_module == old_settings_module:
             # Then we're already using that settings file. Great!
             logging.debug('Running %s(*%s, **%s) without modifying settings.',
@@ -79,6 +84,20 @@ def patch_settings(func):
             new_settings = Settings(new_settings_module)
 
         settings._wrapped = new_settings
+
+        # Override other globals which were generated based on the old settings.
+        old_db_connections = db.connections
+        old_db_router = db.router
+        old_db_connection = db.connection
+        old_db_backend = db.backend
+        db.connections = ConnectionHandler(new_settings.DATABASES)
+        db.router = ConnectionRouter(settings.DATABASE_ROUTERS)
+        db.connection = db.connections[DEFAULT_DB_ALIAS]
+        db.backend = load_backend(db.connection.settings_dict['ENGINE'])
+
+        old_haystack_backend = haystack.backend
+        haystack.backend = haystack.load_backend(new_settings.HAYSTACK_SEARCH_ENGINE)
+
         try:
             return func(*args, **kwargs)
         finally:
@@ -86,6 +105,13 @@ def patch_settings(func):
                           func.func_name, args, kwargs)
             settings._wrapped = old_settings
             os.environ['DJANGO_SETTINGS_MODULE'] = old_settings_module
+
+            # Reset the other stuff.
+            db.connections = old_db_connections
+            db.router = old_db_router
+            db.connection = old_db_connection
+            db.backend = old_db_backend
+            haystack.backend = old_haystack_backend
     return wrapper
 
 
@@ -402,7 +428,7 @@ def haystack_update_index(app_label, model_name, pk, is_removal):
 
     """
     model_class = get_model(app_label, model_name)
-    search_index = site.get_index(model_class)
+    search_index = haystack.site.get_index(model_class)
     try:
         if is_removal:
             instance = model_class(pk=pk)
