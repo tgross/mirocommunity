@@ -15,13 +15,14 @@
 # along with Miro Community.  If not, see <http://www.gnu.org/licenses/>.
 
 import datetime
+from functools import wraps
 import os
 import logging
 import random
 
 from celery.exceptions import MaxRetriesExceededError
 from celery.task import task
-from django.conf import settings
+from django.conf import settings, Settings
 from django.db.models.loading import get_model
 from django.contrib.auth.models import User
 from haystack import site
@@ -50,87 +51,77 @@ from localtv.models import Video, Feed, SiteLocation, SavedSearch, Category
 from localtv.tiers import Tier
 
 
-CELERY_USING = getattr(settings, 'LOCALTV_CELERY_USING', 'default')
+def patch_settings(func):
+    """
+    Decorates a function and gives it an extra "settings" kwargs. The value of
+    this kwarg is used to override the global settings for the duration of the
+    function's run.
 
+    """
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        settings_module = kwargs.pop('settings')
+        old_settings_module = settings.SETTINGS_MODULE
+        old_settings = settings._wrapped
+        if settings_module == old_settings_module:
+            # Then we're already using that settings file. Great!
+            logging.debug('Running %s(*%s, **%s) without modifying settings.',
+                          func.func_name, args, kwargs)
+            new_settings = old_settings
+        else:
+            logging.debug('Overriding %s with %s to run %s(*%s, **%s).',
+                          old_settings_module, settings_module, func.func_name,
+                          args, kwargs)
+            new_settings = Settings(settings_module)
 
-if hasattr(settings.DATABASES, 'module'):
-    def patch_settings(func):
-        def wrapper(*args, **kwargs):
-            using = kwargs.get('using', None)
-            if using in (None, 'default', CELERY_USING):
-                logging.info('running %s(*%s, **%s) on default',
-                             func, args, kwargs)
-                kwargs['using'] = 'default'
-                return func(*args, **kwargs)
-            logging.info('running %s(*%s, **%s) on %s',
-                         func, args, kwargs, using)
-            environ = os.environ.copy()
-            wrapped = settings._wrapped
-            os.environ['DJANGO_SETTINGS_MODULE'] = '%s.settings' % using
-            new_settings = settings.DATABASES.module(using)
-            new_settings.DATABASES = settings.DATABASES
-            settings._wrapped = new_settings
-            try:
-                return func(*args, **kwargs)
-            finally:
-                settings._wrapped = wrapped
-                os.environ = environ
-        wrapper.func_name = func.func_name
-        wrapper.func_doc = func.func_doc
-        wrapper.func_defaults = func.func_defaults
-        return wrapper
-else:
-    def patch_settings(func):
-        def wrapper(*args, **kwargs):
-            using = kwargs.get('using', None)
-            if using == CELERY_USING:
-                kwargs['using'] = 'default'
+        settings._wrapped = new_settings
+        try:
             return func(*args, **kwargs)
-        wrapper.func_name = func.func_name
-        wrapper.func_doc = func.func_doc
-        wrapper.func_defaults = func.func_defaults
-        return wrapper
+        finally:
+            logging.debug('Resetting settings after running %s(*%s, **%s).',
+                          func.func_name, args, kwargs)
+            settings._wrapped = old_settings
+    return wrapper
+
 
 @task(ignore_result=True)
 @patch_settings
-def update_sources(using='default'):
-    feeds = Feed.objects.using(using).filter(status=Feed.ACTIVE,
-                                             auto_update=True)
+def update_sources():
+    feeds = Feed.objects.filter(status=Feed.ACTIVE, auto_update=True)
     for feed_pk in feeds.values_list('pk', flat=True):
-        feed_update.delay(feed_pk, using=using)
+        feed_update.delay(feed_pk, settings=settings.SETTINGS_MODULE)
 
-    searches = SavedSearch.objects.using(using).filter(auto_update=True)
+    searches = SavedSearch.objects.filter(auto_update=True)
     for search_pk in searches.values_list('pk', flat=True):
-        search_update.delay(search_pk, using=using)
+        search_update.delay(search_pk, settings=settings.SETTINGS_MODULE)
+
 
 @task(ignore_result=True)
 @patch_settings
-def feed_update(feed_id, using='default'):
+def feed_update(feed_id):
     try:
-        feed = Feed.objects.using(using).get(pk=feed_id)
+        feed = Feed.objects.get(pk=feed_id)
     except Feed.DoesNotExist:
-        logging.warn('feed_update(%s, using=%r) could not find feed',
-                     feed_id, using)
+        logging.warn('feed_update(%s) could not find feed', feed_id)
         return
 
-    feed.update(using=using, clear_rejected=True)
+    feed.update(clear_rejected=True)
+
 
 @task(ignore_result=True)
 @patch_settings
-def search_update(search_id, using='default'):
+def search_update(search_id):
     try:
-        search = SavedSearch.objects.using(using).get(pk=search_id)
+        search = SavedSearch.objects.get(pk=search_id)
     except SavedSearch.DoesNotExist:
-        logging.warn('search_update(%s, using=%r) could not find search',
-                     search_id, using)
+        logging.warn('search_update(%s) could not find search', search_id)
         return
-    search.update(using=using, clear_rejected=True)
+    search.update(clear_rejected=True)
 
 
 @task(ignore_result=True, max_retries=None, default_retry_delay=30)
 @patch_settings
-def mark_import_pending(import_app_label, import_model, import_pk,
-                        using='default'):
+def mark_import_pending(import_app_label, import_model, import_pk):
     """
     Checks whether an import's first stage is complete. If it's not, retries
     the task with a countdown of 30.
@@ -138,7 +129,7 @@ def mark_import_pending(import_app_label, import_model, import_pk,
     """
     import_class = get_model(import_app_label, import_model)
     try:
-        source_import = import_class._default_manager.using(using).get(
+        source_import = import_class._default_manager.get(
                                                     pk=import_pk,
                                                     status=import_class.STARTED)
     except import_class.DoesNotExist:
@@ -170,17 +161,16 @@ def mark_import_pending(import_app_label, import_model, import_pk,
     # Otherwise the first stage is complete. Check whether they can take all the
     # videos.
     active_set = None
-    unapproved_set = source_import.get_videos(using).filter(
+    unapproved_set = source_import.get_videos().filter(
         status=Video.PENDING)
     if source_import.auto_approve:
-        if not SiteLocation.enforce_tiers(using=using):
+        if not SiteLocation.enforce_tiers():
             active_set = unapproved_set
             unapproved_set = None
         else:
             remaining_videos = (Tier.get().videos_limit()
-                                - Video.objects.using(using
-                                    ).filter(status=Video.ACTIVE
-                                    ).count())
+                                - Video.objects.filter(status=Video.ACTIVE
+                                              ).count())
             if remaining_videos > source_import.videos_imported:
                 active_set = unapproved_set
                 unapproved_set = None
@@ -201,23 +191,22 @@ def mark_import_pending(import_app_label, import_model, import_pk,
     source_import.status = import_class.PENDING
     source_import.save()
 
-    active_pks = source_import.get_videos(using).filter(
+    active_pks = source_import.get_videos().filter(
                          status=Video.ACTIVE).values_list('pk', flat=True)
     if active_pks:
         opts = Video._meta
         for pk in active_pks:
             haystack_update_index.delay(opts.app_label, opts.module_name,
                                         pk, is_removal=False,
-                                        using=using)
+                                        settings=settings.SETTINGS_MODULE)
 
     mark_import_complete.delay(import_app_label, import_model, import_pk,
-                               using=using)
+                               settings=settings.SETTINGS_MODULE)
 
 
 @task(ignore_result=True, max_retries=None, default_retry_delay=30)
 @patch_settings
-def mark_import_complete(import_app_label, import_model, import_pk,
-                         using='default'):
+def mark_import_complete(import_app_label, import_model, import_pk):
     """
     Checks whether an import's second stage is complete. If it's not, retries
     the task with a countdown of 30.
@@ -225,7 +214,7 @@ def mark_import_complete(import_app_label, import_model, import_pk,
     """
     import_class = get_model(import_app_label, import_model)
     try:
-        source_import = import_class._default_manager.using(using).get(
+        source_import = import_class._default_manager.get(
                                                     pk=import_pk,
                                                     status=import_class.PENDING)
     except import_class.DoesNotExist:
@@ -236,8 +225,8 @@ def mark_import_complete(import_app_label, import_model, import_pk,
             raise MaxRetriesExceededError
         mark_import_complete.retry()
 
-    video_pks = list(source_import.get_videos(using).filter(
-                            status=Video.ACTIVE).values_list('pk', flat=True))
+    video_pks = list(source_import.get_videos().filter(status=Video.ACTIVE
+                                              ).values_list('pk', flat=True))
     video_count = len(video_pks)
     if not video_pks:
         # Don't bother with the haystack query.
@@ -252,9 +241,9 @@ def mark_import_complete(import_app_label, import_model, import_pk,
         haystack_count = SearchQuerySet().models(Video).filter(**haystack_filter
                                                       ).count()
     
-    logging.debug(('mark_import_complete(%s, %s, %i, using=%s). video_count: '
+    logging.debug(('mark_import_complete(%s, %s, %i). video_count: '
                    '%i, haystack_count: %i'), import_app_label, import_model,
-                   import_pk, using, video_count, haystack_count)
+                   import_pk, video_count, haystack_count)
     if haystack_count >= video_count:
         source_import.status = import_class.COMPLETE
         if import_app_label == 'localtv' and import_model == 'feedimport':
@@ -273,13 +262,11 @@ def mark_import_complete(import_app_label, import_model, import_pk,
 def video_from_vidscraper_video(vidscraper_video, site_pk,
                                 import_app_label=None, import_model=None,
                                 import_pk=None, status=None, author_pks=None,
-                                category_pks=None, clear_rejected=False,
-                                using='default'):
+                                category_pks=None, clear_rejected=False):
     import_class = get_model(import_app_label, import_model)
     try:
-        source_import = import_class.objects.using(using).get(
-           pk=import_pk,
-           status=import_class.STARTED)
+        source_import = import_class.objects.get(pk=import_pk,
+                                                 status=import_class.STARTED)
     except import_class.DoesNotExist, e:
         logging.warn('Retrying %r: expected %s instance (pk=%r) missing.',
                      vidscraper_video.url, import_class.__name__, import_pk)
@@ -293,15 +280,14 @@ def video_from_vidscraper_video(vidscraper_video, site_pk,
             source_import.handle_error(
                 ('Skipped %r: Could not load video data.'
                  % vidscraper_video.url),
-                using=using, is_skip=True,
-                with_exception=True)
+                is_skip=True, with_exception=True)
             return
 
         if not vidscraper_video.title:
             source_import.handle_error(
                 ('Skipped %r: Failed to scrape basic data.'
                  % vidscraper_video.url),
-                is_skip=True, using=using)
+                is_skip=True)
             return
 
         if ((vidscraper_video.file_url_expires or
@@ -309,10 +295,10 @@ def video_from_vidscraper_video(vidscraper_video, site_pk,
             and not vidscraper_video.embed_code):
             source_import.handle_error(('Skipping %r: no file or embed code.'
                                         % vidscraper_video.url),
-                                       is_skip=True, using=using)
+                                       is_skip=True)
             return
 
-        site_videos = Video.objects.using(using).filter(site=site_pk)
+        site_videos = Video.objects.filter(site=site_pk)
 
         if vidscraper_video.guid:
             guid_videos = site_videos.filter(guid=vidscraper_video.guid)
@@ -321,7 +307,7 @@ def video_from_vidscraper_video(vidscraper_video, site_pk,
             if guid_videos.exists():
                 source_import.handle_error(('Skipping %r: duplicate guid.'
                                             % vidscraper_video.url),
-                                           is_skip=True, using=using)
+                                           is_skip=True)
                 return
 
         if vidscraper_video.link:
@@ -332,13 +318,13 @@ def video_from_vidscraper_video(vidscraper_video, site_pk,
             if videos_with_link.exists():
                 source_import.handle_error(('Skipping %r: duplicate link.'
                                             % vidscraper_video.url),
-                                           is_skip=True, using=using)
+                                           is_skip=True)
                 return
 
-        categories = Category.objects.using(using).filter(pk__in=category_pks)
+        categories = Category.objects.filter(pk__in=category_pks)
 
         if author_pks:
-            authors = User.objects.using(using).filter(pk__in=author_pks)
+            authors = User.objects.filter(pk__in=author_pks)
         else:
             if vidscraper_video.user:
                 name = vidscraper_video.user
@@ -346,14 +332,14 @@ def video_from_vidscraper_video(vidscraper_video, site_pk,
                     first, last = name.split(' ', 1)
                 else:
                     first, last = name, ''
-                author, created = User.objects.db_manager(using).get_or_create(
+                author, created = User.objects.get_or_create(
                     username=name[:30],
                     defaults={'first_name': first[:30],
                               'last_name': last[:30]})
                 if created:
                     author.set_unusable_password()
                     author.save()
-                    utils.get_profile_model().objects.db_manager(using).create(
+                    utils.get_profile_model().objects.create(
                        user=author,
                        website=vidscraper_video.user_url or '')
                 authors = [author]
@@ -363,30 +349,27 @@ def video_from_vidscraper_video(vidscraper_video, site_pk,
         # Since we check above whether the vidscraper_video is valid, we don't
         # catch InvalidVideo here, since it would be unexpected.
         video = Video.from_vidscraper_video(vidscraper_video, status=status,
-                                            using=using,
                                             source_import=source_import,
                                             authors=authors,
                                             categories=categories,
                                             site_pk=site_pk)
         logging.debug('Made video %i: %r', video.pk, video.name)
         if video.thumbnail_url:
-            video_save_thumbnail.delay(video.pk, using=using)
+            video_save_thumbnail.delay(video.pk,
+                                       settings=settings.SETTINGS_MODULE)
     except Exception:
         source_import.handle_error(('Unknown error during import of %r'
                                     % vidscraper_video.url),
-                                   is_skip=True, using=using,
-                                   with_exception=True)
+                                   is_skip=True, with_exception=True)
         raise # so it shows up in the Celery log
 
 @task(ignore_result=True)
 @patch_settings
-def video_save_thumbnail(video_pk, using='default'):
+def video_save_thumbnail(video_pk):
     try:
-        v = Video.objects.using(using).get(pk=video_pk)
+        v = Video.objects.get(pk=video_pk)
     except Video.DoesNotExist:
-        logging.warn(
-            'video_save_thumbnail(%s, using=%r) could not find video',
-            video_pk, using)
+        logging.warn('video_save_thumbnail(%s) could not find video', video_pk)
         return
     try:
         v.save_thumbnail()
@@ -394,16 +377,13 @@ def video_save_thumbnail(video_pk, using='default'):
         try:
             return video_save_thumbnail.retry()
         except MaxRetriesExceededError:
-            logging.warn(
-                'video_save_thumbnail(%s, using=%r) exceeded max retries',
-                video_pk, using
-            )
+            logging.warn('video_save_thumbnail(%s) exceeded max retries',
+                         video_pk)
         
 
 @task(ignore_result=True, max_retries=None)
 @patch_settings
-def haystack_update_index(app_label, model_name, pk, is_removal,
-                          using='default'):
+def haystack_update_index(app_label, model_name, pk, is_removal):
     """
     Updates a haystack index for the given model (specified by ``app_label``
     and ``model_name``). If ``is_removal`` is ``True``, a fake instance is
@@ -424,11 +404,11 @@ def haystack_update_index(app_label, model_name, pk, is_removal,
             search_index.remove_object(instance)
         else:
             try:
-                instance = Video.objects.using(using).get(pk=pk)
+                instance = Video.objects.get(pk=pk)
             except model_class.DoesNotExist:
-                logging.debug(('haystack_update_index(%r, %r, %r, %r, using=%r)'
+                logging.debug(('haystack_update_index(%r, %r, %r, %r)'
                                ' could not find video with pk %i'), app_label,
-                               model_name, pk, is_removal, using, pk)
+                               model_name, pk, is_removal, pk)
             else:
                 if instance.status == Video.ACTIVE:
                     search_index.update_object(instance)
@@ -438,8 +418,8 @@ def haystack_update_index(app_label, model_name, pk, is_removal,
         # maximum wait is ~30s
         exp = min(haystack_update_index.request.retries, 4)
         countdown = random.random() * (2 ** exp)
-        logging.debug(('haystack_update_index(%r, %r, %r, %r, using=%r) '
+        logging.debug(('haystack_update_index(%r, %r, %r, %r) '
                        'retrying due to %s with countdown %r'), app_label,
-                       model_name, pk, is_removal, using, e.__class__.__name__,
+                       model_name, pk, is_removal, e.__class__.__name__,
                        countdown)
         haystack_update_index.retry(countdown=countdown)

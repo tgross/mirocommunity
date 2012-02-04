@@ -38,9 +38,10 @@ from importlib import import_module
 import vidscraper
 
 from localtv.decorators import require_site_admin, referrer_redirect
-from localtv import tasks, utils
-from localtv.models import Feed, SiteLocation
+from localtv import utils
 from localtv.admin import forms
+from localtv.models import Feed, SiteLocation
+from localtv.tasks import feed_update
 
 Profile = utils.get_profile_model()
 
@@ -137,9 +138,7 @@ def add_feed(request):
                 feed.auto_authors.add(user)
             feed.save()
 
-            tasks.feed_update.delay(
-                feed.pk,
-                using=tasks.CELERY_USING)
+            feed_update.delay(feed.pk, settings=settings.SETTINGS_MODULE)
             
             return HttpResponseRedirect(reverse('localtv_admin_manage_page'))
 

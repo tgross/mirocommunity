@@ -14,18 +14,17 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with Miro Community.  If not, see <http://www.gnu.org/licenses/>.
 
+from django.conf import settings
 from django.db.models import Count, signals
 from django.forms.models import model_to_dict
 from django.utils.encoding import force_unicode
-
 from haystack import indexes
 from haystack import site
+
 from localtv.models import Video, Watch
 from localtv.search.utils import SortFilterMixin
 from localtv.tasks import haystack_update_index
 
-from django.conf import settings
-CELERY_USING = getattr(settings, 'LOCALTV_CELERY_USING', 'default')
 
 class QueuedSearchIndex(indexes.SearchIndex):
     def _setup_save(self, model):
@@ -47,18 +46,11 @@ class QueuedSearchIndex(indexes.SearchIndex):
         self._enqueue_instance(instance, True)
 
     def _enqueue_instance(self, instance, is_removal):
-        using = instance._state.db
-        if using == 'default':
-            # This gets called from both Celery and from the MC application.
-            # If we're in the web app, `using` is generally 'default', so we
-            # need to use CELERY_USING as our database.  If they're the same,
-            # or we're not using separate databases, this is a no-op.
-            using = CELERY_USING
         haystack_update_index.delay(instance._meta.app_label,
                                     instance._meta.module_name,
                                     instance.pk,
                                     is_removal,
-                                    using=using)
+                                    settings=settings.SETTINGS_MODULE)
 
 
 class VideoIndex(QueuedSearchIndex):

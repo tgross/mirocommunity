@@ -16,7 +16,9 @@
 
 from django.conf import settings
 from django.core.management.base import NoArgsCommand
+
 from localtv.management import site_too_old
+from localtv.tasks import update_sources
 
 class Command(NoArgsCommand):
 
@@ -25,8 +27,5 @@ class Command(NoArgsCommand):
     def handle_noargs(self, **options):
         if site_too_old():
             return
-
-        from localtv import tasks
         
-        tasks.update_sources.delay(
-            using=tasks.CELERY_USING)
+        update_sources.delay(settings=settings.SETTINGS_MODULE)

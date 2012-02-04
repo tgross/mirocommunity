@@ -344,7 +344,7 @@ class Tier(object):
 
         Returns False if it is *not* okay to add more videos to the site.'''
         if self.sitelocation:
-            enforce = self.sitelocation.enforce_tiers(using=self.sitelocation._state.db)
+            enforce = self.sitelocation.enforce_tiers()
         else:
             enforce = localtv.models.SiteLocation.enforce_tiers()
         if not enforce:
