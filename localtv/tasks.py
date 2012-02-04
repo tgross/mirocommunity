@@ -60,19 +60,23 @@ def patch_settings(func):
     """
     @wraps(func)
     def wrapper(*args, **kwargs):
-        settings_module = kwargs.pop('settings')
+        new_settings_module = kwargs.pop('settings')
         old_settings_module = settings.SETTINGS_MODULE
+        # This is a HACK since we currently rely on this environment variable to
+        # generate a site's settings file. Should be safe to modify since it's
+        # really only used to set up the settings.
+        os.environ['DJANGO_SETTINGS_MODULE'] = new_settings_module
         old_settings = settings._wrapped
-        if settings_module == old_settings_module:
+        if new_settings_module == old_settings_module:
             # Then we're already using that settings file. Great!
             logging.debug('Running %s(*%s, **%s) without modifying settings.',
                           func.func_name, args, kwargs)
             new_settings = old_settings
         else:
             logging.debug('Overriding %s with %s to run %s(*%s, **%s).',
-                          old_settings_module, settings_module, func.func_name,
-                          args, kwargs)
-            new_settings = Settings(settings_module)
+                          old_settings_module, new_settings_module,
+                          func.func_name, args, kwargs)
+            new_settings = Settings(new_settings_module)
 
         settings._wrapped = new_settings
         try:
@@ -81,6 +85,7 @@ def patch_settings(func):
             logging.debug('Resetting settings after running %s(*%s, **%s).',
                           func.func_name, args, kwargs)
             settings._wrapped = old_settings
+            os.environ['DJANGO_SETTINGS_MODULE'] = old_settings_module
     return wrapper
 
 
